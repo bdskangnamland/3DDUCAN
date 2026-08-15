@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace BrickKids3D
@@ -30,7 +31,10 @@ namespace BrickKids3D
             body.transform.SetParent(root.transform, false);
             body.transform.localPosition = Vector3.zero;
             body.transform.localScale = new Vector3(w * GridUnit - Gap, BrickHeight - Gap, d * GridUnit - Gap);
-            Object.DestroyImmediate(body.GetComponent<Collider>());
+
+            var bodyCollider = body.GetComponent<Collider>();
+            if (bodyCollider != null) UnityEngine.Object.Destroy(bodyCollider);
+
             ApplyMaterial(body.GetComponent<Renderer>(), color, preview);
 
             for (int x = 0; x < w; x++)
@@ -45,7 +49,10 @@ namespace BrickKids3D
                         BrickHeight * 0.5f + 0.075f,
                         -d * 0.5f + 0.5f + z);
                     stud.transform.localScale = new Vector3(0.46f, 0.075f, 0.46f);
-                    Object.DestroyImmediate(stud.GetComponent<Collider>());
+
+                    var studCollider = stud.GetComponent<Collider>();
+                    if (studCollider != null) UnityEngine.Object.Destroy(studCollider);
+
                     ApplyMaterial(stud.GetComponent<Renderer>(), color, preview);
                 }
             }
@@ -54,6 +61,7 @@ namespace BrickKids3D
             collider.center = Vector3.zero;
             collider.size = new Vector3(w * GridUnit - Gap, BrickHeight - Gap, d * GridUnit - Gap);
             collider.enabled = !preview;
+
             return piece;
         }
 
@@ -68,25 +76,49 @@ namespace BrickKids3D
 
         private static void ApplyMaterial(Renderer renderer, Color color, bool transparent)
         {
-            Shader shader = Shader.Find("Standard");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            var mat = new Material(shader);
-            Color c = color;
-            if (transparent) c.a = 0.48f;
-            mat.color = c;
+            if (renderer == null) return;
 
-            if (transparent && mat.HasProperty("_Mode"))
+            try
             {
-                mat.SetFloat("_Mode", 3f);
-                mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                mat.SetInt("_ZWrite", 0);
-                mat.DisableKeyword("_ALPHATEST_ON");
-                mat.EnableKeyword("_ALPHABLEND_ON");
-                mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                mat.renderQueue = 3000;
+                // Primitive renderers already have a usable built-in material.
+                // This avoids relying on a Shader.Find("Standard") result in player builds.
+                Material mat = renderer.material;
+
+                if (mat == null)
+                {
+                    Shader shader = Shader.Find("UI/Default");
+                    if (shader == null) shader = Shader.Find("Sprites/Default");
+                    if (shader == null) shader = Shader.Find("Unlit/Color");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    if (shader == null) return;
+
+                    mat = new Material(shader);
+                    renderer.material = mat;
+                }
+
+                Color c = color;
+                if (transparent) c.a = 0.48f;
+                mat.color = c;
+
+                if (transparent)
+                {
+                    if (mat.HasProperty("_Mode")) mat.SetFloat("_Mode", 3f);
+                    if (mat.HasProperty("_SrcBlend"))
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    if (mat.HasProperty("_DstBlend"))
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
+
+                    mat.DisableKeyword("_ALPHATEST_ON");
+                    mat.EnableKeyword("_ALPHABLEND_ON");
+                    mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                    mat.renderQueue = 3000;
+                }
             }
-            renderer.material = mat;
+            catch (Exception e)
+            {
+                Debug.LogWarning("Brick material fallback: " + e.Message);
+            }
         }
     }
 }

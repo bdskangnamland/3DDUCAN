@@ -7,15 +7,9 @@ using UnityEngine.SceneManagement;
 
 namespace BrickKids3D.EditorTools
 {
-    [InitializeOnLoad]
     public static class BrickKidsProjectSetup
     {
         private const string ScenePath = "Assets/BrickKidsDemo.unity";
-
-        static BrickKidsProjectSetup()
-        {
-            EditorApplication.delayCall += EnsureScene;
-        }
 
         [MenuItem("Brick Kids 3D/Open Demo Scene")]
         public static void OpenDemoScene()
@@ -36,20 +30,15 @@ namespace BrickKids3D.EditorTools
             PlayerSettings.companyName = "Somet";
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "vn.somet.brickkids3d");
 
-            // Android moi: bat buoc tao native 64-bit de chay tren thiet bi ARM64-only.
-            // IL2CPP cho phep build ARM64.
             PlayerSettings.SetScriptingBackend(
                 BuildTargetGroup.Android,
                 ScriptingImplementation.IL2CPP
             );
 
-            // Tao APK universal: ho tro ca tablet/phone ARM64 moi va ARMv7 cu.
             PlayerSettings.Android.targetArchitectures =
                 AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
 
             PlayerSettings.Android.buildApkPerCpuArchitecture = false;
-
-            // Android 6.0+; target API tu dong dung API cao nhat co trong bo build.
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel23;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
 
@@ -67,40 +56,37 @@ namespace BrickKids3D.EditorTools
                 options = BuildOptions.None
             };
 
-            BuildPipeline.BuildPlayer(options);
+            BuildReportOrThrow(options);
+        }
+
+        private static void BuildReportOrThrow(BuildPlayerOptions options)
+        {
+            var report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            {
+                throw new System.Exception(
+                    "BrickKids Android build failed: " + report.summary.result
+                );
+            }
         }
 
         private static void EnsureScene()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            // IMPORTANT:
+            // Build a clean empty scene. The actual game is started by
+            // BrickKidsRuntimeStarter after the scene loads.
+            Scene scene = EditorSceneManager.NewScene(
+                NewSceneSetup.EmptyScene,
+                NewSceneMode.Single
+            );
 
-            if (!File.Exists(ScenePath))
-            {
-                Scene scene = EditorSceneManager.NewScene(
-                    NewSceneSetup.EmptyScene,
-                    NewSceneMode.Single
-                );
+            EditorSceneManager.SaveScene(scene, ScenePath);
 
-                var bootstrap = new GameObject("BrickKidsBootstrap");
-                bootstrap.AddComponent<BrickKidsBootstrap>();
-                EditorSceneManager.SaveScene(scene, ScenePath);
-            }
+            EditorBuildSettings.scenes =
+                new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
-            bool exists = false;
-            foreach (var s in EditorBuildSettings.scenes)
-            {
-                if (s.path == ScenePath)
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists)
-            {
-                EditorBuildSettings.scenes =
-                    new[] { new EditorBuildSettingsScene(ScenePath, true) };
-            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
         }
     }
 }

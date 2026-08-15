@@ -1,7 +1,7 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace BrickKids3D
@@ -16,20 +16,49 @@ namespace BrickKids3D
 
         public void Build()
         {
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            font = GetSafeFont();
 
             var canvasGO = new GameObject("KidsUI");
             var canvas = canvasGO.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasGO.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            canvasGO.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1280, 800);
-            canvasGO.GetComponent<CanvasScaler>().matchWidthOrHeight = 0.5f;
+
+            var scaler = canvasGO.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 800);
+            scaler.matchWidthOrHeight = 0.5f;
+
             canvasGO.AddComponent<GraphicRaycaster>();
 
             MakeTopBar(canvas.transform);
             MakeBrickBar(canvas.transform);
             MakeColorBar(canvas.transform);
             Refresh("SAN SANG XEP HINH");
+        }
+
+        private Font GetSafeFont()
+        {
+            try
+            {
+                Font f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (f != null) return f;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("LegacyRuntime font unavailable: " + e.Message);
+            }
+
+            try
+            {
+                Font f = Font.CreateDynamicFontFromOSFont(
+                    new[] { "Roboto", "Arial", "sans-serif" }, 18);
+                if (f != null) return f;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("OS font fallback unavailable: " + e.Message);
+            }
+
+            return null;
         }
 
         private void MakeTopBar(Transform parent)
@@ -125,8 +154,10 @@ namespace BrickKids3D
         {
             var go = new GameObject("Btn_" + text);
             go.transform.SetParent(parent, false);
+
             var image = go.AddComponent<Image>();
             image.color = new Color(0.18f, 0.22f, 0.30f, 0.96f);
+
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener(action);
@@ -156,6 +187,7 @@ namespace BrickKids3D
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
+
             var t = go.AddComponent<Text>();
             t.text = value;
             t.font = font;
@@ -170,14 +202,19 @@ namespace BrickKids3D
 
         private void Anchor(RectTransform rt, Vector2 min, Vector2 max, Vector2 size, Vector2 pos)
         {
-            rt.anchorMin = min; rt.anchorMax = max; rt.pivot = new Vector2(0.5f, 1f);
-            rt.sizeDelta = size; rt.anchoredPosition = pos;
+            rt.anchorMin = min;
+            rt.anchorMax = max;
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = pos;
         }
 
         private void Stretch(RectTransform rt, float inset)
         {
-            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(inset, inset); rt.offsetMax = new Vector2(-inset, -inset);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(inset, inset);
+            rt.offsetMax = new Vector2(-inset, -inset);
         }
     }
 }
