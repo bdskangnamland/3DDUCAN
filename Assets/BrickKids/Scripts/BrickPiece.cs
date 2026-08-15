@@ -12,11 +12,14 @@ namespace BrickKids3D
         public Color PieceColor { get; private set; }
         public bool IsPreview { get; private set; }
 
+        private Mesh generatedMesh;
+        private Renderer cachedRenderer;
+
         public int Width
         {
             get
             {
-                var s = BrickCatalog.Get(BrickId);
+                BrickSpec s = BrickCatalog.Get(BrickId);
                 return RotationStep % 2 == 0 ? s.width : s.depth;
             }
         }
@@ -25,12 +28,12 @@ namespace BrickKids3D
         {
             get
             {
-                var s = BrickCatalog.Get(BrickId);
+                BrickSpec s = BrickCatalog.Get(BrickId);
                 return RotationStep % 2 == 0 ? s.depth : s.width;
             }
         }
 
-        public void Configure(string id, int gx, int gy, int gz, int rotationStep, Color color, bool preview)
+        public void Configure(string id, int gx, int gy, int gz, int rotationStep, Color color, bool preview, Mesh mesh)
         {
             BrickId = id;
             GridX = gx;
@@ -39,6 +42,8 @@ namespace BrickKids3D
             RotationStep = ((rotationStep % 4) + 4) % 4;
             PieceColor = color;
             IsPreview = preview;
+            generatedMesh = mesh;
+            cachedRenderer = GetComponent<Renderer>();
         }
 
         public void SetGridPosition(int gx, int gy, int gz)
@@ -50,9 +55,16 @@ namespace BrickKids3D
 
         public void SetPreviewColor(Color color)
         {
-            foreach (var r in GetComponentsInChildren<Renderer>())
+            if (cachedRenderer == null) cachedRenderer = GetComponent<Renderer>();
+            BrickMaterialLibrary.SetColor(cachedRenderer, color);
+        }
+
+        private void OnDestroy()
+        {
+            if (generatedMesh != null)
             {
-                if (r.material != null) r.material.color = color;
+                Destroy(generatedMesh);
+                generatedMesh = null;
             }
         }
     }

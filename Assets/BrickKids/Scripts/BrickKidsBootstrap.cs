@@ -6,11 +6,15 @@ namespace BrickKids3D
 {
     public class BrickKidsBootstrap : MonoBehaviour
     {
+        public static readonly Rect WorkspaceViewport =
+            new Rect(0.095f, 0.155f, 0.84f, 0.745f);
+
         private bool worldCreated;
 
-        void Awake()
+        private void Awake()
         {
             Application.targetFrameRate = 60;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
             EnsureWorld();
         }
 
@@ -24,209 +28,87 @@ namespace BrickKids3D
 
             worldCreated = true;
 
-            // Camera must exist first. Even if a decoration/material fails,
-            // the player will never be left with a no-camera grey/black screen.
-            Camera cam = EnsureCamera();
-
-            Transform root = new GameObject("BrickRoot").transform;
-
-            var managerGO = new GameObject("BuildManager");
-            var manager = managerGO.AddComponent<BuildManager>();
-            manager.worldCamera = cam;
-            manager.brickRoot = root;
-
             try
             {
+                CreateBackgroundCamera();
+                Camera worldCamera = CreateWorldCamera();
                 EnsureEventSystem();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("BrickKids EventSystem error: " + e);
-            }
 
-            try
-            {
-                CreateBoard();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("BrickKids board error: " + e);
-            }
+                Transform brickRoot = new GameObject("BrickRoot").transform;
 
-            try
-            {
-                CreateOrbit(cam, manager);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("BrickKids orbit camera error: " + e);
-            }
+                GameObject managerObject = new GameObject("BuildManager");
+                BuildManager manager = managerObject.AddComponent<BuildManager>();
+                manager.worldCamera = worldCamera;
+                manager.brickRoot = brickRoot;
+                manager.boardHalfSize = 9;
 
-            try
-            {
-                var uiGO = new GameObject("RuntimeUIBuilder");
-                var ui = uiGO.AddComponent<RuntimeUI>();
+                BoardFactory.CreateStudioFloor();
+                BoardFactory.CreateBaseplate(manager.boardHalfSize);
+
+                Transform focus = new GameObject("CameraFocus").transform;
+                focus.position = new Vector3(0f, 1.7f, 0f);
+
+                OrbitCamera orbit = worldCamera.gameObject.AddComponent<OrbitCamera>();
+                orbit.target = focus;
+                orbit.buildManager = manager;
+                manager.orbitCamera = orbit;
+
+                GameObject uiObject = new GameObject("RuntimeUIBuilder");
+                RuntimeUI ui = uiObject.AddComponent<RuntimeUI>();
                 ui.manager = manager;
                 manager.runtimeUI = ui;
                 ui.Build();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("BrickKids UI error: " + e);
-            }
 
-            try
-            {
-                CreateLights();
+                RenderSettings.fog = false;
+                QualitySettings.antiAliasing = 2;
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                Debug.LogError("BrickKids light error: " + e);
+                Debug.LogError("BrickKids startup failed: " + exception);
             }
         }
 
-        private Camera EnsureCamera()
+        private void CreateBackgroundCamera()
         {
-            Camera cam = Camera.main;
-            if (cam != null)
-                return cam;
+            GameObject cameraObject = new GameObject("Background Camera");
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.depth = -10f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.045f, 0.060f, 0.085f);
+            camera.cullingMask = 0;
+            camera.rect = new Rect(0f, 0f, 1f, 1f);
+            camera.allowHDR = false;
+            camera.allowMSAA = false;
+        }
 
-            var camGO = new GameObject("Main Camera");
-            camGO.tag = "MainCamera";
+        private Camera CreateWorldCamera()
+        {
+            GameObject cameraObject = new GameObject("Main Camera");
+            cameraObject.tag = "MainCamera";
 
-            cam = camGO.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.63f, 0.82f, 0.95f);
-            cam.fieldOfView = 48f;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 200f;
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.depth = 0f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.91f, 0.945f, 0.97f);
+            camera.fieldOfView = 45f;
+            camera.nearClipPlane = 0.1f;
+            camera.farClipPlane = 150f;
+            camera.allowHDR = false;
+            camera.allowMSAA = true;
+            camera.rect = WorkspaceViewport;
 
-            // Valid initial view even before OrbitCamera gets its first LateUpdate.
-            camGO.transform.position = new Vector3(-9f, 11f, -9f);
-            camGO.transform.LookAt(new Vector3(0f, 1.5f, 0f));
-
-            return cam;
+            cameraObject.transform.position = new Vector3(-9f, 11f, -9f);
+            cameraObject.transform.LookAt(new Vector3(0f, 1.5f, 0f));
+            return camera;
         }
 
         private void EnsureEventSystem()
         {
-            if (FindObjectOfType<EventSystem>() != null)
-                return;
+            if (FindObjectOfType<EventSystem>() != null) return;
 
-            var es = new GameObject("EventSystem");
-            es.AddComponent<EventSystem>();
-            es.AddComponent<StandaloneInputModule>();
-        }
-
-        private void CreateBoard()
-        {
-            var board = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            board.name = "BuildBoard";
-            board.transform.position = new Vector3(0, -0.08f, 0);
-            board.transform.localScale = new Vector3(20f, 0.15f, 20f);
-
-            // Use the primitive's existing built-in material instead of
-            // new Material(Shader.Find("Standard")). Standard can be stripped on Android.
-            var renderer = board.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                try
-                {
-                    Material mat = renderer.material;
-                    if (mat != null)
-                        mat.color = new Color(0.87f, 0.90f, 0.93f);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning("Board material skipped: " + e.Message);
-                }
-            }
-
-            CreateGridLines();
-        }
-
-        private void CreateOrbit(Camera cam, BuildManager manager)
-        {
-            var focus = new GameObject("CameraFocus").transform;
-            focus.position = new Vector3(0, 1.5f, 0);
-
-            var orbit = cam.gameObject.AddComponent<OrbitCamera>();
-            orbit.target = focus;
-            orbit.buildManager = manager;
-        }
-
-        private void CreateLights()
-        {
-            var lightGO = new GameObject("Sun");
-            var light = lightGO.AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = 1.1f;
-            light.shadows = LightShadows.Soft;
-            lightGO.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
-
-            var fillGO = new GameObject("Fill Light");
-            var fill = fillGO.AddComponent<Light>();
-            fill.type = LightType.Directional;
-            fill.intensity = 0.45f;
-            fillGO.transform.rotation = Quaternion.Euler(35f, 140f, 0f);
-
-            RenderSettings.ambientLight = new Color(0.62f, 0.66f, 0.72f);
-        }
-
-        private void CreateGridLines()
-        {
-            Shader shader = FindSafeShader();
-            if (shader == null)
-            {
-                Debug.LogWarning("BrickKids: no safe line shader found; grid lines skipped.");
-                return;
-            }
-
-            var lineRoot = new GameObject("GridLines").transform;
-
-            for (int i = -10; i <= 10; i++)
-            {
-                MakeLine(lineRoot, new Vector3(i, 0.01f, -10), new Vector3(i, 0.01f, 10), shader);
-                MakeLine(lineRoot, new Vector3(-10, 0.01f, i), new Vector3(10, 0.01f, i), shader);
-            }
-        }
-
-        private Shader FindSafeShader()
-        {
-            Shader shader = Shader.Find("Sprites/Default");
-            if (shader == null) shader = Shader.Find("UI/Default");
-            if (shader == null) shader = Shader.Find("Unlit/Color");
-            if (shader == null) shader = Shader.Find("Standard");
-            return shader;
-        }
-
-        private void MakeLine(Transform parent, Vector3 a, Vector3 b, Shader shader)
-        {
-            if (shader == null) return;
-
-            var go = new GameObject("GridLine");
-            go.transform.SetParent(parent, false);
-
-            var lr = go.AddComponent<LineRenderer>();
-            lr.positionCount = 2;
-            lr.SetPosition(0, a);
-            lr.SetPosition(1, b);
-            lr.startWidth = 0.012f;
-            lr.endWidth = 0.012f;
-            lr.useWorldSpace = true;
-
-            try
-            {
-                lr.material = new Material(shader);
-            }
-            catch
-            {
-                // Lines are optional. Never stop startup because of a shader.
-            }
-
-            Color c = new Color(0.45f, 0.50f, 0.56f, 0.38f);
-            lr.startColor = c;
-            lr.endColor = c;
+            GameObject eventSystemObject = new GameObject("EventSystem");
+            eventSystemObject.AddComponent<EventSystem>();
+            eventSystemObject.AddComponent<StandaloneInputModule>();
         }
     }
 }

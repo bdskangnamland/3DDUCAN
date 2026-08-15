@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BrickKids3D
@@ -6,62 +6,68 @@ namespace BrickKids3D
     public static class BrickFactory
     {
         public const float GridUnit = 1f;
-        public const float BrickHeight = 0.60f;
-        private const float Gap = 0.035f;
+        public const float BrickHeight = 0.62f;
+        private const float Gap = 0.045f;
 
         public static BrickPiece Create(string id, int gx, int gy, int gz, int rotationStep, Color color, bool preview, Transform parent)
         {
-            BrickSpec baseSpec = BrickCatalog.Get(id);
+            BrickSpec spec = BrickCatalog.Get(id);
             int rs = ((rotationStep % 4) + 4) % 4;
-            int w = rs % 2 == 0 ? baseSpec.width : baseSpec.depth;
-            int d = rs % 2 == 0 ? baseSpec.depth : baseSpec.width;
+            int w = rs % 2 == 0 ? spec.width : spec.depth;
+            int d = rs % 2 == 0 ? spec.depth : spec.width;
 
-            var root = new GameObject("Brick_" + id);
-            root.transform.SetParent(parent, false);
-            var piece = root.AddComponent<BrickPiece>();
-            piece.Configure(id, gx, gy, gz, rs, color, preview);
+            List<CombineInstance> parts = new List<CombineInstance>(1 + w * d);
 
-            float cx = gx + w * 0.5f;
-            float cz = gz + d * 0.5f;
-            float cy = gy * BrickHeight + BrickHeight * 0.5f;
-            root.transform.position = new Vector3(cx, cy, cz);
-
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            body.name = "Body";
-            body.transform.SetParent(root.transform, false);
-            body.transform.localPosition = Vector3.zero;
-            body.transform.localScale = new Vector3(w * GridUnit - Gap, BrickHeight - Gap, d * GridUnit - Gap);
-
-            var bodyCollider = body.GetComponent<Collider>();
-            if (bodyCollider != null) UnityEngine.Object.Destroy(bodyCollider);
-
-            ApplyMaterial(body.GetComponent<Renderer>(), color, preview);
+            CombineInstance body = new CombineInstance();
+            body.mesh = PrimitiveMeshLibrary.Cube;
+            body.transform = Matrix4x4.TRS(
+                Vector3.zero,
+                Quaternion.identity,
+                new Vector3(w * GridUnit - Gap, BrickHeight - 0.045f, d * GridUnit - Gap));
+            parts.Add(body);
 
             for (int x = 0; x < w; x++)
             {
                 for (int z = 0; z < d; z++)
                 {
-                    var stud = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    stud.name = "Stud";
-                    stud.transform.SetParent(root.transform, false);
-                    stud.transform.localPosition = new Vector3(
-                        -w * 0.5f + 0.5f + x,
-                        BrickHeight * 0.5f + 0.075f,
-                        -d * 0.5f + 0.5f + z);
-                    stud.transform.localScale = new Vector3(0.46f, 0.075f, 0.46f);
-
-                    var studCollider = stud.GetComponent<Collider>();
-                    if (studCollider != null) UnityEngine.Object.Destroy(studCollider);
-
-                    ApplyMaterial(stud.GetComponent<Renderer>(), color, preview);
+                    CombineInstance stud = new CombineInstance();
+                    stud.mesh = PrimitiveMeshLibrary.Cylinder;
+                    stud.transform = Matrix4x4.TRS(
+                        new Vector3(
+                            -w * 0.5f + 0.5f + x,
+                            BrickHeight * 0.5f + 0.055f,
+                            -d * 0.5f + 0.5f + z),
+                        Quaternion.identity,
+                        new Vector3(0.44f, 0.055f, 0.44f));
+                    parts.Add(stud);
                 }
             }
 
-            var collider = root.AddComponent<BoxCollider>();
+            Mesh mesh = PrimitiveMeshLibrary.Combine(parts, "BrickMesh_" + id);
+
+            GameObject root = new GameObject("Brick_" + id);
+            root.transform.SetParent(parent, false);
+            root.transform.position = new Vector3(
+                gx + w * 0.5f,
+                gy * BrickHeight + BrickHeight * 0.5f,
+                gz + d * 0.5f);
+
+            MeshFilter filter = root.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
+
+            MeshRenderer renderer = root.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = preview ? BrickMaterialLibrary.Ghost : BrickMaterialLibrary.Plastic;
+            Color visualColor = color;
+            if (preview) visualColor.a = 0.46f;
+            BrickMaterialLibrary.SetColor(renderer, visualColor);
+
+            BoxCollider collider = root.AddComponent<BoxCollider>();
             collider.center = Vector3.zero;
-            collider.size = new Vector3(w * GridUnit - Gap, BrickHeight - Gap, d * GridUnit - Gap);
+            collider.size = new Vector3(w * GridUnit - Gap, BrickHeight - 0.03f, d * GridUnit - Gap);
             collider.enabled = !preview;
 
+            BrickPiece piece = root.AddComponent<BrickPiece>();
+            piece.Configure(id, gx, gy, gz, rs, color, preview, mesh);
             return piece;
         }
 
@@ -72,53 +78,6 @@ namespace BrickKids3D
                 gx + piece.Width * 0.5f,
                 gy * BrickHeight + BrickHeight * 0.5f,
                 gz + piece.Depth * 0.5f);
-        }
-
-        private static void ApplyMaterial(Renderer renderer, Color color, bool transparent)
-        {
-            if (renderer == null) return;
-
-            try
-            {
-                // Primitive renderers already have a usable built-in material.
-                // This avoids relying on a Shader.Find("Standard") result in player builds.
-                Material mat = renderer.material;
-
-                if (mat == null)
-                {
-                    Shader shader = Shader.Find("UI/Default");
-                    if (shader == null) shader = Shader.Find("Sprites/Default");
-                    if (shader == null) shader = Shader.Find("Unlit/Color");
-                    if (shader == null) shader = Shader.Find("Standard");
-                    if (shader == null) return;
-
-                    mat = new Material(shader);
-                    renderer.material = mat;
-                }
-
-                Color c = color;
-                if (transparent) c.a = 0.48f;
-                mat.color = c;
-
-                if (transparent)
-                {
-                    if (mat.HasProperty("_Mode")) mat.SetFloat("_Mode", 3f);
-                    if (mat.HasProperty("_SrcBlend"))
-                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    if (mat.HasProperty("_DstBlend"))
-                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
-
-                    mat.DisableKeyword("_ALPHATEST_ON");
-                    mat.EnableKeyword("_ALPHABLEND_ON");
-                    mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                    mat.renderQueue = 3000;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("Brick material fallback: " + e.Message);
-            }
         }
     }
 }

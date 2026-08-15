@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BrickKids3D
 {
@@ -36,8 +35,8 @@ namespace BrickKids3D
 
         public static BrickSpec Get(string id)
         {
-            foreach (var spec in Specs)
-                if (spec.id == id) return spec;
+            for (int i = 0; i < Specs.Length; i++)
+                if (Specs[i].id == id) return Specs[i];
             return Specs[7];
         }
     }
