@@ -1,0 +1,36 @@
+BRICK KIDS 3D - BUILD APK BANG GITHUB ACTIONS
+=============================================
+
+Project Unity: 2022.3.62f1
+Package Android: vn.somet.brickkids3d
+APK output: Builds/Android/BrickKids3D.apk
+
+1) Tao repository GitHub moi, vi du: BrickKids3D
+2) Upload TOAN BO NOI DUNG cua thu muc nay vao ROOT repo:
+   Assets/
+   Packages/
+   ProjectSettings/
+   .github/
+   .gitignore
+   ...
+   Luu y: KHONG de them 1 lop thu muc BrickKids3D o ben ngoai.
+
+3) Cai Unity Hub tren Windows, dang nhap tai khoan Unity Personal va kich hoat license.
+4) Lay file license tai:
+   C:\ProgramData\Unity\Unity_lic.ulf
+
+5) Vao repo GitHub:
+   Settings > Secrets and variables > Actions > New repository secret
+
+   Tao 3 secret:
+   UNITY_LICENSE  = toan bo noi dung file Unity_lic.ulf
+   UNITY_EMAIL    = email tai khoan Unity
+   UNITY_PASSWORD = mat khau tai khoan Unity
+
+6) Vao tab Actions > Build Android APK > Run workflow > Run workflow.
+
+7) Khi build xanh:
+   mo lan build > phan Artifacts > tai BrickKids3D-Android-APK.
+   Giai nen artifact de lay BrickKids3D.apk.
+
+KHONG dua file Unity_lic.ulf, email hay password vao source code/repository.
