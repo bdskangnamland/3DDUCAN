@@ -1,26 +1,28 @@
-Shader "BrickKids/Ghost"
+Shader "BrickKids/Glass"
 {
     Properties
     {
-        _Color ("Color", Color) = (0.2,1,0.3,0.45)
-        _Smoothness ("Smoothness", Range(0,1)) = 0.4
+        _Color ("Tint", Color) = (0.62,0.86,1.0,0.35)
+        _Metallic ("Metallic", Range(0,1)) = 0.05
+        _Smoothness ("Smoothness", Range(0,1)) = 0.92
     }
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" }
-        LOD 200
+        LOD 250
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
         CGPROGRAM
         #pragma surface surf Standard alpha:fade
         #pragma target 3.0
         fixed4 _Color;
+        half _Metallic;
         half _Smoothness;
         struct Input { float3 worldPos; };
         void surf (Input IN, inout SurfaceOutputStandard o)
         {
             o.Albedo = _Color.rgb;
-            o.Metallic = 0.0;
+            o.Metallic = _Metallic;
             o.Smoothness = _Smoothness;
             o.Alpha = _Color.a;
         }

@@ -11,21 +11,32 @@ namespace BrickKids3D
         public Transform brickRoot;
         public RuntimeUI runtimeUI;
         public OrbitCamera orbitCamera;
-        public int boardHalfSize = 9;
+        public EnvironmentController environmentController;
 
         public string SelectedBrickId { get; private set; } = "2x4";
-        public Color SelectedColor { get; private set; } = new Color(0.93f, 0.18f, 0.13f);
+        public Color SelectedColor { get; private set; } =
+            new Color(0.93f, 0.18f, 0.13f);
+
         public int RotationStep { get; private set; }
         public bool DeleteMode { get; private set; }
+        public bool CameraNavigationMode { get; private set; }
         public bool IsPlacingGesture { get; private set; }
+
         public bool CanUndo { get { return undo.Count > 0; } }
         public bool CanRedo { get { return redo.Count > 0; } }
         public int PieceCount { get { return pieces.Count; } }
 
-        private readonly List<BrickPiece> pieces = new List<BrickPiece>();
-        private readonly Dictionary<Vector3Int, BrickPiece> occupied = new Dictionary<Vector3Int, BrickPiece>();
-        private readonly Stack<BuildAction> undo = new Stack<BuildAction>();
-        private readonly Stack<BuildAction> redo = new Stack<BuildAction>();
+        private readonly List<BrickPiece> pieces =
+            new List<BrickPiece>();
+
+        private readonly Dictionary<Vector3Int, BrickPiece> occupied =
+            new Dictionary<Vector3Int, BrickPiece>();
+
+        private readonly Stack<BuildAction> undo =
+            new Stack<BuildAction>();
+
+        private readonly Stack<BuildAction> redo =
+            new Stack<BuildAction>();
 
         private BrickPiece ghost;
         private bool ghostValid;
@@ -55,8 +66,16 @@ namespace BrickKids3D
 
         public void SetBrick(string id)
         {
+            SetItem(id);
+        }
+
+        public void SetItem(string id)
+        {
+            if (!BrickCatalog.Contains(id)) return;
+
             SelectedBrickId = id;
             DeleteMode = false;
+            CameraNavigationMode = false;
             DestroyGhost();
             Notify();
         }
@@ -79,8 +98,26 @@ namespace BrickKids3D
         public void ToggleDeleteMode()
         {
             DeleteMode = !DeleteMode;
+            CameraNavigationMode = false;
             DestroyGhost();
             Notify();
+        }
+
+        public void ToggleCameraNavigationMode()
+        {
+            CameraNavigationMode = !CameraNavigationMode;
+            DeleteMode = false;
+            CancelPreviewGesture();
+            Notify();
+        }
+
+        public void SetEnvironmentTheme(int index)
+        {
+            if (environmentController != null)
+                environmentController.SetTheme(index);
+
+            if (runtimeUI != null)
+                runtimeUI.RefreshState();
         }
 
         public void SaveCurrent()
@@ -112,6 +149,7 @@ namespace BrickKids3D
 
             undo.Clear();
             redo.Clear();
+            FocusAll();
             Notify(UIFeedback.Load);
         }
 
@@ -130,7 +168,8 @@ namespace BrickKids3D
             if (action.wasPlacement)
             {
                 BrickPiece piece = FindPiece(action.record);
-                if (piece != null) RemovePiece(piece, false);
+                if (piece != null)
+                    RemovePiece(piece, false);
             }
             else
             {
@@ -154,7 +193,8 @@ namespace BrickKids3D
             else
             {
                 BrickPiece piece = FindPiece(action.record);
-                if (piece != null) RemovePiece(piece, false);
+                if (piece != null)
+                    RemovePiece(piece, false);
             }
 
             undo.Push(action);
@@ -165,7 +205,11 @@ namespace BrickKids3D
         {
             try
             {
-                string file = "BrickKids_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
+                string file =
+                    "BrickKids_" +
+                    DateTime.Now.ToString("yyyyMMdd_HHmmss") +
+                    ".png";
+
                 ScreenCapture.CaptureScreenshot(file);
                 Notify(UIFeedback.Screenshot);
             }
@@ -177,30 +221,92 @@ namespace BrickKids3D
 
         public void ResetCamera()
         {
-            if (orbitCamera != null) orbitCamera.ResetView();
+            if (orbitCamera != null)
+                orbitCamera.ResetView();
+        }
+
+        public void FocusAll()
+        {
+            if (orbitCamera == null) return;
+
+            Bounds bounds;
+            if (TryGetBuildBounds(out bounds))
+                orbitCamera.FitBounds(bounds);
+            else
+                orbitCamera.ResetView();
         }
 
         public void ZoomIn()
         {
-            if (orbitCamera != null) orbitCamera.ZoomBy(-2.2f);
+            if (orbitCamera != null)
+                orbitCamera.ZoomBy(-1f);
         }
 
         public void ZoomOut()
         {
-            if (orbitCamera != null) orbitCamera.ZoomBy(2.2f);
+            if (orbitCamera != null)
+                orbitCamera.ZoomBy(1f);
+        }
+
+        public bool TryGetBuildBounds(out Bounds bounds)
+        {
+            bool hasBounds = false;
+            bounds = new Bounds(Vector3.zero, Vector3.one);
+
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                BrickPiece piece = pieces[i];
+                if (piece == null) continue;
+
+                Renderer[] renderers =
+                    piece.GetComponentsInChildren<Renderer>(true);
+
+                if (renderers.Length > 0)
+                {
+                    for (int r = 0; r < renderers.Length; r++)
+                    {
+                        if (!renderers[r].enabled) continue;
+
+                        if (!hasBounds)
+                        {
+                            bounds = renderers[r].bounds;
+                            hasBounds = true;
+                        }
+                        else
+                        {
+                            bounds.Encapsulate(renderers[r].bounds);
+                        }
+                    }
+                }
+                else
+                {
+                    if (!hasBounds)
+                    {
+                        bounds = new Bounds(piece.transform.position, Vector3.one);
+                        hasBounds = true;
+                    }
+                    else
+                    {
+                        bounds.Encapsulate(piece.transform.position);
+                    }
+                }
+            }
+
+            return hasBounds;
         }
 
         public void LoadTemplate(int templateIndex)
         {
             ClearAllInternal(true);
 
-            if (templateIndex == 0) BuildHouse();
-            else if (templateIndex == 1) BuildCar();
-            else if (templateIndex == 2) BuildRobot();
-            else BuildTower();
+            if (templateIndex == 0) BuildHouseScene();
+            else if (templateIndex == 1) BuildStreetScene();
+            else if (templateIndex == 2) BuildGardenScene();
+            else BuildTowerScene();
 
             undo.Clear();
             redo.Clear();
+            FocusAll();
             Notify(UIFeedback.Template);
         }
 
@@ -213,26 +319,37 @@ namespace BrickKids3D
 
         private void HandleTouch()
         {
-            if (Input.touchCount == 0)
+            if (CameraNavigationMode)
             {
-                if (activeFinger >= 0) CancelPreviewGesture();
+                CancelPreviewGesture();
                 return;
             }
 
-            if (Input.touchCount > 1) return;
+            if (Input.touchCount == 0)
+            {
+                if (activeFinger >= 0)
+                    CancelPreviewGesture();
+                return;
+            }
+
+            if (Input.touchCount > 1)
+                return;
 
             Touch touch = Input.GetTouch(0);
 
             if (EventSystem.current != null &&
-                EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                EventSystem.current.IsPointerOverGameObject(
+                    touch.fingerId))
             {
-                if (touch.phase == TouchPhase.Began) CancelPreviewGesture();
+                if (touch.phase == TouchPhase.Began)
+                    CancelPreviewGesture();
                 return;
             }
 
             if (!IsInsideWorkspace(touch.position))
             {
-                if (touch.phase == TouchPhase.Began) CancelPreviewGesture();
+                if (touch.phase == TouchPhase.Began)
+                    CancelPreviewGesture();
                 return;
             }
 
@@ -250,18 +367,26 @@ namespace BrickKids3D
                     activeFinger = touch.fingerId;
                 }
             }
-            else if (IsPlacingGesture &&
-                     touch.fingerId == activeFinger &&
-                     (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary))
+            else if (
+                IsPlacingGesture &&
+                touch.fingerId == activeFinger &&
+                (touch.phase == TouchPhase.Moved ||
+                 touch.phase == TouchPhase.Stationary))
             {
                 TryUpdateGhost(touch.position);
             }
-            else if (IsPlacingGesture &&
-                     touch.fingerId == activeFinger &&
-                     (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled))
+            else if (
+                IsPlacingGesture &&
+                touch.fingerId == activeFinger &&
+                (touch.phase == TouchPhase.Ended ||
+                 touch.phase == TouchPhase.Canceled))
             {
-                if (touch.phase == TouchPhase.Ended && ghost != null && ghostValid)
+                if (touch.phase == TouchPhase.Ended &&
+                    ghost != null &&
+                    ghostValid)
+                {
                     CommitGhost();
+                }
 
                 CancelPreviewGesture();
             }
@@ -269,24 +394,38 @@ namespace BrickKids3D
 
         private void HandleMouse()
         {
+            if (CameraNavigationMode) return;
             if (Input.touchCount > 0) return;
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+            if (EventSystem.current != null &&
+                EventSystem.current.IsPointerOverGameObject())
+                return;
 
             Vector2 mouse = Input.mousePosition;
-            if (!IsInsideWorkspace(mouse)) return;
+
+            if (!IsInsideWorkspace(mouse))
+                return;
 
             if (Input.GetMouseButtonDown(0))
             {
-                if (DeleteMode) TryDeleteAt(mouse);
-                else if (TryUpdateGhost(mouse)) IsPlacingGesture = true;
+                if (DeleteMode)
+                    TryDeleteAt(mouse);
+                else if (TryUpdateGhost(mouse))
+                    IsPlacingGesture = true;
             }
 
-            if (Input.GetMouseButton(0) && IsPlacingGesture)
-                TryUpdateGhost(mouse);
-
-            if (Input.GetMouseButtonUp(0) && IsPlacingGesture)
+            if (Input.GetMouseButton(0) &&
+                IsPlacingGesture)
             {
-                if (ghost != null && ghostValid) CommitGhost();
+                TryUpdateGhost(mouse);
+            }
+
+            if (Input.GetMouseButtonUp(0) &&
+                IsPlacingGesture)
+            {
+                if (ghost != null && ghostValid)
+                    CommitGhost();
+
                 CancelPreviewGesture();
             }
         }
@@ -299,36 +438,58 @@ namespace BrickKids3D
 
         private bool TryUpdateGhost(Vector2 screen)
         {
-            if (worldCamera == null || !IsInsideWorkspace(screen)) return false;
+            if (worldCamera == null ||
+                !IsInsideWorkspace(screen))
+                return false;
 
-            Ray ray = worldCamera.ScreenPointToRay(screen);
-            RaycastHit hit;
+            BrickSpec selectedSpec =
+                BrickCatalog.Get(SelectedBrickId);
 
-            if (!Physics.Raycast(ray, out hit, 100f))
+            Ray ray =
+                worldCamera.ScreenPointToRay(screen);
+
+            Vector3 placementPoint;
+            int gy;
+
+            if (!TryGetPlacementPoint(
+                ray,
+                selectedSpec,
+                out placementPoint,
+                out gy))
             {
                 DestroyGhost();
                 return false;
             }
 
-            int gy = 0;
-            BrickPiece hitPiece = hit.collider.GetComponentInParent<BrickPiece>();
-            if (hitPiece != null) gy = hitPiece.GridY + 1;
+            int w =
+                RotationStep % 2 == 0
+                ? selectedSpec.width
+                : selectedSpec.depth;
 
-            BrickSpec baseSpec = BrickCatalog.Get(SelectedBrickId);
-            int w = RotationStep % 2 == 0 ? baseSpec.width : baseSpec.depth;
-            int d = RotationStep % 2 == 0 ? baseSpec.depth : baseSpec.width;
+            int d =
+                RotationStep % 2 == 0
+                ? selectedSpec.depth
+                : selectedSpec.width;
 
-            int gx = Mathf.FloorToInt(hit.point.x - w * 0.5f + 0.5f);
-            int gz = Mathf.FloorToInt(hit.point.z - d * 0.5f + 0.5f);
+            // No clamp: logical construction coordinates are unlimited.
+            int gx =
+                Mathf.FloorToInt(
+                    placementPoint.x -
+                    w * 0.5f +
+                    0.5f);
 
-            gx = Mathf.Clamp(gx, -boardHalfSize, boardHalfSize - w);
-            gz = Mathf.Clamp(gz, -boardHalfSize, boardHalfSize - d);
+            int gz =
+                Mathf.FloorToInt(
+                    placementPoint.z -
+                    d * 0.5f +
+                    0.5f);
 
             if (ghost == null ||
                 ghost.BrickId != SelectedBrickId ||
                 ghost.RotationStep != RotationStep)
             {
                 DestroyGhost();
+
                 ghost = BrickFactory.Create(
                     SelectedBrickId,
                     gx,
@@ -341,38 +502,170 @@ namespace BrickKids3D
             }
             else
             {
-                BrickFactory.Move(ghost, gx, gy, gz);
+                BrickFactory.Move(
+                    ghost,
+                    gx,
+                    gy,
+                    gz);
             }
 
-            ghostValid = CanPlace(gx, gy, gz, w, d);
+            ghostValid =
+                CanPlace(
+                    selectedSpec,
+                    gx,
+                    gy,
+                    gz,
+                    w,
+                    d);
 
-            Color previewColor = ghostValid
-                ? new Color(0.18f, 0.92f, 0.42f, 0.46f)
-                : new Color(1.00f, 0.20f, 0.18f, 0.46f);
+            Color previewColor =
+                ghostValid
+                ? new Color(
+                    0.18f,
+                    0.92f,
+                    0.42f,
+                    0.46f)
+                : new Color(
+                    1.00f,
+                    0.20f,
+                    0.18f,
+                    0.46f);
 
-            ghost.SetPreviewColor(previewColor);
+            ghost.SetPreviewColor(
+                previewColor);
+
             return true;
         }
 
-        private bool CanPlace(int gx, int gy, int gz, int w, int d)
+        private bool TryGetPlacementPoint(
+            Ray ray,
+            BrickSpec selectedSpec,
+            out Vector3 point,
+            out int gy)
         {
-            for (int x = 0; x < w; x++)
+            point = Vector3.zero;
+            gy = 0;
+
+            // Ground-only objects always use the true infinite ground plane.
+            // This lets roads, trees and vehicles be placed on visual road/water
+            // surfaces without being forced to "stack" by their colliders.
+            if (selectedSpec.groundOnly)
             {
-                for (int z = 0; z < d; z++)
+                Plane ground =
+                    new Plane(
+                        Vector3.up,
+                        Vector3.zero);
+
+                float enter;
+                if (!ground.Raycast(ray, out enter))
+                    return false;
+
+                point = ray.GetPoint(enter);
+                gy = 0;
+                return true;
+            }
+
+            RaycastHit hit;
+            if (Physics.Raycast(
+                ray,
+                out hit,
+                2000f))
+            {
+                BrickPiece hitPiece =
+                    hit.collider.GetComponentInParent<BrickPiece>();
+
+                if (hitPiece != null)
                 {
-                    if (occupied.ContainsKey(new Vector3Int(gx + x, gy, gz + z)))
-                        return false;
+                    point = hit.point;
+
+                    if (hitPiece.IsSurface)
+                    {
+                        gy = 0;
+                    }
+                    else
+                    {
+                        gy =
+                            hitPiece.GridY +
+                            hitPiece.HeightLayers;
+                    }
+
+                    return true;
                 }
             }
 
-            if (gy == 0) return true;
+            Plane fallbackGround =
+                new Plane(
+                    Vector3.up,
+                    Vector3.zero);
 
+            float fallbackEnter;
+            if (!fallbackGround.Raycast(
+                ray,
+                out fallbackEnter))
+                return false;
+
+            point =
+                ray.GetPoint(fallbackEnter);
+            gy = 0;
+            return true;
+        }
+
+        private bool CanPlace(
+            BrickSpec spec,
+            int gx,
+            int gy,
+            int gz,
+            int w,
+            int d)
+        {
+            if (spec.groundOnly && gy != 0)
+                return false;
+
+            // Roads, sidewalks, parking and water can layer visually.
+            // They do not consume solid construction cells.
+            if (spec.isSurface)
+                return gy == 0;
+
+            int h =
+                Mathf.Max(
+                    1,
+                    spec.heightLayers);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    for (int z = 0; z < d; z++)
+                    {
+                        if (occupied.ContainsKey(
+                            new Vector3Int(
+                                gx + x,
+                                gy + y,
+                                gz + z)))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            if (gy == 0)
+                return true;
+
+            // A piece only needs at least one supported cell beneath it,
+            // matching toy-brick behaviour and allowing overhangs.
             for (int x = 0; x < w; x++)
             {
                 for (int z = 0; z < d; z++)
                 {
-                    if (occupied.ContainsKey(new Vector3Int(gx + x, gy - 1, gz + z)))
+                    if (occupied.ContainsKey(
+                        new Vector3Int(
+                            gx + x,
+                            gy - 1,
+                            gz + z)))
+                    {
                         return true;
+                    }
                 }
             }
 
@@ -381,152 +674,253 @@ namespace BrickKids3D
 
         private void CommitGhost()
         {
-            if (ghost == null || !ghostValid) return;
+            if (ghost == null ||
+                !ghostValid)
+                return;
 
-            BrickRecord record = MakeRecord(
-                ghost.BrickId,
-                ghost.GridX,
-                ghost.GridY,
-                ghost.GridZ,
-                ghost.RotationStep,
-                SelectedColor);
+            BrickRecord record =
+                MakeRecord(
+                    ghost.BrickId,
+                    ghost.GridX,
+                    ghost.GridY,
+                    ghost.GridZ,
+                    ghost.RotationStep,
+                    SelectedColor);
 
             DestroyGhost();
             PlaceRecord(record, true);
             Notify();
         }
 
-        private void PlaceRecord(BrickRecord record, bool recordUndo)
+        private void PlaceRecord(
+            BrickRecord record,
+            bool recordUndo)
         {
-            Color color = new Color(
-                record.r,
-                record.g,
-                record.b,
-                record.a <= 0f ? 1f : record.a);
+            string id =
+                BrickCatalog.Contains(record.id)
+                ? record.id
+                : "2x4";
 
-            BrickSpec spec = BrickCatalog.Get(record.id);
-            int w = record.rotation % 2 == 0 ? spec.width : spec.depth;
-            int d = record.rotation % 2 == 0 ? spec.depth : spec.width;
+            BrickSpec spec =
+                BrickCatalog.Get(id);
 
-            if (!CanPlace(record.x, record.y, record.z, w, d) && record.y != 0) return;
-            if (HasOverlap(record.x, record.y, record.z, w, d)) return;
+            Color color =
+                new Color(
+                    record.r,
+                    record.g,
+                    record.b,
+                    record.a <= 0f
+                        ? 1f
+                        : record.a);
 
-            BrickPiece piece = BrickFactory.Create(
-                record.id,
+            int rotation =
+                ((record.rotation % 4) + 4) % 4;
+
+            int w =
+                rotation % 2 == 0
+                ? spec.width
+                : spec.depth;
+
+            int d =
+                rotation % 2 == 0
+                ? spec.depth
+                : spec.width;
+
+            if (!CanPlace(
+                spec,
                 record.x,
                 record.y,
                 record.z,
-                record.rotation,
-                color,
-                false,
-                brickRoot);
+                w,
+                d))
+            {
+                return;
+            }
+
+            BrickPiece piece =
+                BrickFactory.Create(
+                    id,
+                    record.x,
+                    record.y,
+                    record.z,
+                    rotation,
+                    color,
+                    false,
+                    brickRoot);
 
             pieces.Add(piece);
             Mark(piece, true);
 
             if (recordUndo)
             {
-                undo.Push(new BuildAction { wasPlacement = true, record = record });
+                BrickRecord normalized =
+                    MakeRecord(
+                        id,
+                        record.x,
+                        record.y,
+                        record.z,
+                        rotation,
+                        color);
+
+                undo.Push(
+                    new BuildAction
+                    {
+                        wasPlacement = true,
+                        record = normalized
+                    });
+
                 redo.Clear();
             }
         }
 
-        private bool HasOverlap(int gx, int gy, int gz, int w, int d)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                for (int z = 0; z < d; z++)
-                {
-                    if (occupied.ContainsKey(new Vector3Int(gx + x, gy, gz + z)))
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
         private void TryDeleteAt(Vector2 screen)
         {
-            if (worldCamera == null || !IsInsideWorkspace(screen)) return;
+            if (worldCamera == null ||
+                !IsInsideWorkspace(screen))
+                return;
 
-            Ray ray = worldCamera.ScreenPointToRay(screen);
+            Ray ray =
+                worldCamera.ScreenPointToRay(screen);
+
             RaycastHit hit;
 
-            if (!Physics.Raycast(ray, out hit, 100f)) return;
+            if (!Physics.Raycast(
+                ray,
+                out hit,
+                2000f))
+                return;
 
-            BrickPiece piece = hit.collider.GetComponentInParent<BrickPiece>();
-            if (piece != null && !piece.IsPreview)
+            BrickPiece piece =
+                hit.collider.GetComponentInParent<BrickPiece>();
+
+            if (piece != null &&
+                !piece.IsPreview)
+            {
                 RemovePiece(piece, true);
+            }
         }
 
-        private void RemovePiece(BrickPiece piece, bool recordUndo)
+        private void RemovePiece(
+            BrickPiece piece,
+            bool recordUndo)
         {
             if (piece == null) return;
 
-            BrickRecord record = ToRecord(piece);
+            BrickRecord record =
+                ToRecord(piece);
+
             Mark(piece, false);
             pieces.Remove(piece);
             Destroy(piece.gameObject);
 
             if (recordUndo)
             {
-                undo.Push(new BuildAction { wasPlacement = false, record = record });
+                undo.Push(
+                    new BuildAction
+                    {
+                        wasPlacement = false,
+                        record = record
+                    });
+
                 redo.Clear();
                 Notify();
             }
         }
 
-        private void Mark(BrickPiece piece, bool add)
+        private void Mark(
+            BrickPiece piece,
+            bool add)
         {
-            for (int x = 0; x < piece.Width; x++)
-            {
-                for (int z = 0; z < piece.Depth; z++)
-                {
-                    Vector3Int key = new Vector3Int(
-                        piece.GridX + x,
-                        piece.GridY,
-                        piece.GridZ + z);
+            if (piece == null ||
+                piece.IsSurface)
+                return;
 
-                    if (add)
+            int height =
+                Mathf.Max(
+                    1,
+                    piece.HeightLayers);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0;
+                     x < piece.Width;
+                     x++)
+                {
+                    for (int z = 0;
+                         z < piece.Depth;
+                         z++)
                     {
-                        occupied[key] = piece;
-                    }
-                    else
-                    {
-                        BrickPiece found;
-                        if (occupied.TryGetValue(key, out found) && found == piece)
-                            occupied.Remove(key);
+                        Vector3Int key =
+                            new Vector3Int(
+                                piece.GridX + x,
+                                piece.GridY + y,
+                                piece.GridZ + z);
+
+                        if (add)
+                        {
+                            occupied[key] =
+                                piece;
+                        }
+                        else
+                        {
+                            BrickPiece found;
+
+                            if (occupied.TryGetValue(
+                                key,
+                                out found) &&
+                                found == piece)
+                            {
+                                occupied.Remove(key);
+                            }
+                        }
                     }
                 }
             }
         }
 
-        private BrickPiece FindPiece(BrickRecord record)
+        private BrickPiece FindPiece(
+            BrickRecord record)
         {
-            return pieces.Find(delegate(BrickPiece piece)
-            {
-                return piece != null &&
-                       piece.BrickId == record.id &&
-                       piece.GridX == record.x &&
-                       piece.GridY == record.y &&
-                       piece.GridZ == record.z &&
-                       piece.RotationStep == record.rotation;
-            });
+            return pieces.Find(
+                delegate(BrickPiece piece)
+                {
+                    return
+                        piece != null &&
+                        piece.BrickId == record.id &&
+                        piece.GridX == record.x &&
+                        piece.GridY == record.y &&
+                        piece.GridZ == record.z &&
+                        piece.RotationStep ==
+                        record.rotation;
+                });
         }
 
         private void DestroyGhost()
         {
-            if (ghost != null) Destroy(ghost.gameObject);
+            if (ghost != null)
+                Destroy(
+                    ghost.gameObject);
+
             ghost = null;
             ghostValid = false;
         }
 
-        private void ClearAllInternal(bool clearHistory)
+        private void ClearAllInternal(
+            bool clearHistory)
         {
             DestroyGhost();
 
-            for (int i = pieces.Count - 1; i >= 0; i--)
-                if (pieces[i] != null) Destroy(pieces[i].gameObject);
+            for (int i =
+                    pieces.Count - 1;
+                 i >= 0;
+                 i--)
+            {
+                if (pieces[i] != null)
+                {
+                    Destroy(
+                        pieces[i].gameObject);
+                }
+            }
 
             pieces.Clear();
             occupied.Clear();
@@ -540,10 +934,18 @@ namespace BrickKids3D
 
         private BuildSaveData MakeSaveData()
         {
-            BuildSaveData data = new BuildSaveData();
+            BuildSaveData data =
+                new BuildSaveData();
 
-            for (int i = 0; i < pieces.Count; i++)
-                if (pieces[i] != null) data.bricks.Add(ToRecord(pieces[i]));
+            for (int i = 0;
+                 i < pieces.Count;
+                 i++)
+            {
+                if (pieces[i] != null)
+                    data.bricks.Add(
+                        ToRecord(
+                            pieces[i]));
+            }
 
             return data;
         }
@@ -553,16 +955,23 @@ namespace BrickKids3D
             try
             {
                 if (pieces.Count > 0)
-                    SaveSystem.Save(2, MakeSaveData());
+                {
+                    SaveSystem.Save(
+                        2,
+                        MakeSaveData());
+                }
             }
             catch
             {
             }
         }
 
-        private BrickRecord ToRecord(BrickPiece piece)
+        private BrickRecord ToRecord(
+            BrickPiece piece)
         {
-            Color color = piece.PieceColor;
+            Color color =
+                piece.PieceColor;
+
             return MakeRecord(
                 piece.BrickId,
                 piece.GridX,
@@ -594,83 +1003,385 @@ namespace BrickKids3D
             };
         }
 
-        private void Notify(UIFeedback feedback)
+        private void Notify(
+            UIFeedback feedback)
         {
-            if (runtimeUI == null) return;
+            if (runtimeUI == null)
+                return;
+
             runtimeUI.RefreshState();
-            if (feedback != UIFeedback.None)
-                runtimeUI.ShowFeedback(feedback);
+
+            if (feedback !=
+                UIFeedback.None)
+            {
+                runtimeUI.ShowFeedback(
+                    feedback);
+            }
         }
 
         private void Notify()
         {
-            Notify(UIFeedback.None);
+            Notify(
+                UIFeedback.None);
         }
 
-        private void BuildHouse()
+        // ---------- Ready-made scenes ----------
+
+        private void BuildHouseScene()
         {
-            Color baseColor = new Color(0.86f, 0.18f, 0.14f);
-            Color wall = new Color(0.97f, 0.73f, 0.12f);
-            Color roof = new Color(0.14f, 0.45f, 0.90f);
+            Color red =
+                new Color(
+                    0.86f,
+                    0.18f,
+                    0.14f);
 
-            for (int x = -4; x <= 2; x += 2)
-                PlaceRecord(MakeRecord("2x8", x, 0, -4, 0, baseColor), false);
+            Color cream =
+                new Color(
+                    0.96f,
+                    0.72f,
+                    0.18f);
 
-            PlaceRecord(MakeRecord("2x8", -4, 1, -4, 1, wall), false);
-            PlaceRecord(MakeRecord("2x8", -4, 1, 2, 1, wall), false);
-            PlaceRecord(MakeRecord("2x4", -4, 1, -2, 0, wall), false);
-            PlaceRecord(MakeRecord("2x4", 2, 1, -2, 0, wall), false);
+            Color roof =
+                new Color(
+                    0.12f,
+                    0.38f,
+                    0.82f);
 
-            PlaceRecord(MakeRecord("2x8", -4, 2, -3, 1, roof), false);
-            PlaceRecord(MakeRecord("2x8", -4, 2, -1, 1, roof), false);
-            PlaceRecord(MakeRecord("2x8", -4, 2, 1, 1, roof), false);
+            // Path and garden.
+            PlaceSimple(
+                "sidewalk",
+                -1,
+                0,
+                -9,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "tree_round",
+                -7,
+                0,
+                -2,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "bush",
+                5,
+                0,
+                -2,
+                0,
+                Color.white);
+
+            // A compact four-layer house block so the roof always has support.
+            for (int layer = 0;
+                 layer < 4;
+                 layer++)
+            {
+                Color layerColor =
+                    layer % 2 == 0
+                    ? red
+                    : cream;
+
+                for (int z = -3;
+                     z <= 3;
+                     z += 2)
+                {
+                    PlaceSimple(
+                        "2x8",
+                        -4,
+                        layer,
+                        z,
+                        1,
+                        layerColor);
+                }
+            }
+
+            // Architectural details sit on the front of the house.
+            PlaceSimple(
+                "door",
+                -1,
+                0,
+                -4,
+                0,
+                new Color(
+                    0.45f,
+                    0.22f,
+                    0.10f));
+
+            PlaceSimple(
+                "window",
+                2,
+                0,
+                -4,
+                0,
+                new Color(
+                    0.92f,
+                    0.92f,
+                    0.96f));
+
+            PlaceSimple(
+                "roof",
+                -2,
+                4,
+                -1,
+                0,
+                roof);
         }
 
-        private void BuildCar()
+        private void BuildStreetScene()
         {
-            Color blue = new Color(0.07f, 0.39f, 0.92f);
-            Color yellow = new Color(1.00f, 0.70f, 0.08f);
-            Color black = new Color(0.08f, 0.09f, 0.11f);
+            PlaceSimple(
+                "road_straight",
+                -2,
+                0,
+                -9,
+                0,
+                Color.white);
 
-            PlaceRecord(MakeRecord("2x8", -4, 0, -2, 1, blue), false);
-            PlaceRecord(MakeRecord("2x8", -4, 0, 0, 1, blue), false);
-            PlaceRecord(MakeRecord("2x4", -2, 1, -2, 1, yellow), false);
-            PlaceRecord(MakeRecord("2x4", -2, 1, 0, 1, yellow), false);
+            PlaceSimple(
+                "road_straight",
+                -2,
+                0,
+                -3,
+                0,
+                Color.white);
 
-            PlaceRecord(MakeRecord("1x2", -3, 0, -3, 1, black), false);
-            PlaceRecord(MakeRecord("1x2", 2, 0, -3, 1, black), false);
-            PlaceRecord(MakeRecord("1x2", -3, 0, 2, 1, black), false);
-            PlaceRecord(MakeRecord("1x2", 2, 0, 2, 1, black), false);
+            PlaceSimple(
+                "road_straight",
+                -2,
+                0,
+                3,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "crosswalk",
+                -2,
+                0,
+                -1,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "car",
+                -1,
+                0,
+                -6,
+                0,
+                new Color(
+                    0.90f,
+                    0.18f,
+                    0.10f));
+
+            PlaceSimple(
+                "bus",
+                -1,
+                0,
+                2,
+                0,
+                new Color(
+                    0.10f,
+                    0.44f,
+                    0.90f));
+
+            PlaceSimple(
+                "lamp",
+                -4,
+                0,
+                -3,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "bench",
+                4,
+                0,
+                -2,
+                0,
+                new Color(
+                    0.50f,
+                    0.28f,
+                    0.12f));
         }
 
-        private void BuildRobot()
+        private void BuildGardenScene()
         {
-            Color body = new Color(0.12f, 0.69f, 0.78f);
-            Color head = new Color(0.93f, 0.23f, 0.18f);
-            Color feet = new Color(0.14f, 0.17f, 0.23f);
+            PlaceSimple(
+                "water",
+                -2,
+                0,
+                -2,
+                0,
+                Color.white);
 
-            PlaceRecord(MakeRecord("2x2", -2, 0, -1, 0, feet), false);
-            PlaceRecord(MakeRecord("2x2", 0, 0, -1, 0, feet), false);
-            PlaceRecord(MakeRecord("2x4", -2, 1, -1, 1, body), false);
-            PlaceRecord(MakeRecord("2x4", -2, 2, -1, 1, body), false);
-            PlaceRecord(MakeRecord("2x2", -1, 3, -1, 0, head), false);
-            PlaceRecord(MakeRecord("1x2", -2, 3, -1, 0, head), false);
-            PlaceRecord(MakeRecord("1x2", 1, 3, -1, 0, head), false);
+            PlaceSimple(
+                "tree_pine",
+                -6,
+                0,
+                -5,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "tree_round",
+                4,
+                0,
+                -5,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "tree_round",
+                -6,
+                0,
+                3,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "bush",
+                4,
+                0,
+                3,
+                0,
+                Color.white);
+
+            for (int i = -3;
+                 i <= 3;
+                 i += 2)
+            {
+                PlaceSimple(
+                    "flower",
+                    i,
+                    0,
+                    4,
+                    0,
+                    Color.white);
+            }
+
+            PlaceSimple(
+                "rock",
+                2,
+                0,
+                1,
+                0,
+                Color.white);
+
+            PlaceSimple(
+                "bench",
+                -1,
+                0,
+                5,
+                1,
+                new Color(
+                    0.48f,
+                    0.28f,
+                    0.14f));
         }
 
-        private void BuildTower()
+        private void BuildTowerScene()
         {
-            Color red = new Color(0.90f, 0.16f, 0.12f);
-            Color yellow = new Color(1.00f, 0.72f, 0.08f);
-            Color green = new Color(0.10f, 0.68f, 0.31f);
-            Color blue = new Color(0.08f, 0.39f, 0.92f);
+            Color red =
+                new Color(
+                    0.90f,
+                    0.16f,
+                    0.12f);
 
-            PlaceRecord(MakeRecord("2x6", -3, 0, -1, 1, red), false);
-            PlaceRecord(MakeRecord("2x6", -1, 1, -3, 0, yellow), false);
-            PlaceRecord(MakeRecord("2x6", -3, 2, -1, 1, green), false);
-            PlaceRecord(MakeRecord("2x6", -1, 3, -3, 0, blue), false);
-            PlaceRecord(MakeRecord("2x4", -2, 4, -1, 1, red), false);
-            PlaceRecord(MakeRecord("2x2", -1, 5, -1, 0, yellow), false);
+            Color yellow =
+                new Color(
+                    1.00f,
+                    0.72f,
+                    0.08f);
+
+            Color green =
+                new Color(
+                    0.10f,
+                    0.68f,
+                    0.31f);
+
+            Color blue =
+                new Color(
+                    0.08f,
+                    0.39f,
+                    0.92f);
+
+            PlaceSimple(
+                "2x8",
+                -4,
+                0,
+                -1,
+                1,
+                red);
+
+            PlaceSimple(
+                "2x8",
+                -1,
+                1,
+                -4,
+                0,
+                yellow);
+
+            PlaceSimple(
+                "2x8",
+                -4,
+                2,
+                -1,
+                1,
+                green);
+
+            PlaceSimple(
+                "2x8",
+                -1,
+                3,
+                -4,
+                0,
+                blue);
+
+            PlaceSimple(
+                "2x6",
+                -3,
+                4,
+                -1,
+                1,
+                red);
+
+            PlaceSimple(
+                "2x4",
+                -2,
+                5,
+                -1,
+                1,
+                yellow);
+
+            PlaceSimple(
+                "2x2",
+                -1,
+                6,
+                -1,
+                0,
+                blue);
+        }
+
+        private void PlaceSimple(
+            string id,
+            int x,
+            int y,
+            int z,
+            int rotation,
+            Color color)
+        {
+            BrickRecord record =
+                MakeRecord(
+                    id,
+                    x,
+                    y,
+                    z,
+                    rotation,
+                    color);
+
+            PlaceRecord(
+                record,
+                false);
         }
     }
 }

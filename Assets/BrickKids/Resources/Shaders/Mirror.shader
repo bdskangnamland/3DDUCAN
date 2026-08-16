@@ -1,10 +1,10 @@
-Shader "BrickKids/Plastic"
+Shader "BrickKids/Mirror"
 {
     Properties
     {
-        _Color ("Color", Color) = (1,1,1,1)
-        _Metallic ("Metallic", Range(0,1)) = 0.03
-        _Smoothness ("Smoothness", Range(0,1)) = 0.62
+        _Color ("Color", Color) = (0.72,0.80,0.86,1)
+        _Metallic ("Metallic", Range(0,1)) = 0.94
+        _Smoothness ("Smoothness", Range(0,1)) = 0.96
     }
     SubShader
     {

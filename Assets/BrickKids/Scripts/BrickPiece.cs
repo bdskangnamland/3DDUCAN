@@ -13,13 +13,17 @@ namespace BrickKids3D
         public bool IsPreview { get; private set; }
 
         private Mesh generatedMesh;
-        private Renderer cachedRenderer;
+
+        public BrickSpec Spec
+        {
+            get { return BrickCatalog.Get(BrickId); }
+        }
 
         public int Width
         {
             get
             {
-                BrickSpec s = BrickCatalog.Get(BrickId);
+                BrickSpec s = Spec;
                 return RotationStep % 2 == 0 ? s.width : s.depth;
             }
         }
@@ -28,12 +32,35 @@ namespace BrickKids3D
         {
             get
             {
-                BrickSpec s = BrickCatalog.Get(BrickId);
+                BrickSpec s = Spec;
                 return RotationStep % 2 == 0 ? s.depth : s.width;
             }
         }
 
-        public void Configure(string id, int gx, int gy, int gz, int rotationStep, Color color, bool preview, Mesh mesh)
+        public int HeightLayers
+        {
+            get { return Spec.heightLayers; }
+        }
+
+        public bool IsSurface
+        {
+            get { return Spec.isSurface; }
+        }
+
+        public bool GroundOnly
+        {
+            get { return Spec.groundOnly; }
+        }
+
+        public void Configure(
+            string id,
+            int gx,
+            int gy,
+            int gz,
+            int rotationStep,
+            Color color,
+            bool preview,
+            Mesh mesh)
         {
             BrickId = id;
             GridX = gx;
@@ -43,7 +70,6 @@ namespace BrickKids3D
             PieceColor = color;
             IsPreview = preview;
             generatedMesh = mesh;
-            cachedRenderer = GetComponent<Renderer>();
         }
 
         public void SetGridPosition(int gx, int gy, int gz)
@@ -55,8 +81,15 @@ namespace BrickKids3D
 
         public void SetPreviewColor(Color color)
         {
-            if (cachedRenderer == null) cachedRenderer = GetComponent<Renderer>();
-            BrickMaterialLibrary.SetColor(cachedRenderer, color);
+            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                BrickMaterialLibrary.SetSurface(
+                    renderers[i],
+                    color,
+                    0.42f,
+                    0.0f);
+            }
         }
 
         private void OnDestroy()
