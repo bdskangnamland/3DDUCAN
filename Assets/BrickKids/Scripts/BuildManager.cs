@@ -16,6 +16,8 @@ namespace BrickKids3D
         public string SelectedBrickId { get; private set; } = "2x4";
         public Color SelectedColor { get; private set; } =
             new Color(0.93f, 0.18f, 0.13f);
+        public MaterialStyle SelectedMaterialStyle { get; private set; } =
+            MaterialStyle.GlossyPlastic;
 
         public int RotationStep { get; private set; }
         public bool DeleteMode { get; private set; }
@@ -83,6 +85,14 @@ namespace BrickKids3D
         public void SetColor(Color color)
         {
             SelectedColor = color;
+            DeleteMode = false;
+            DestroyGhost();
+            Notify();
+        }
+
+        public void SetMaterialStyle(MaterialStyle style)
+        {
+            SelectedMaterialStyle = style;
             DeleteMode = false;
             DestroyGhost();
             Notify();
@@ -223,6 +233,12 @@ namespace BrickKids3D
         {
             if (orbitCamera != null)
                 orbitCamera.ResetView();
+        }
+
+        public void BottomView()
+        {
+            if (orbitCamera != null)
+                orbitCamera.BottomView();
         }
 
         public void FocusAll()
@@ -497,6 +513,7 @@ namespace BrickKids3D
                     gz,
                     RotationStep,
                     SelectedColor,
+                    SelectedMaterialStyle,
                     true,
                     brickRoot);
             }
@@ -685,7 +702,8 @@ namespace BrickKids3D
                     ghost.GridY,
                     ghost.GridZ,
                     ghost.RotationStep,
-                    SelectedColor);
+                    SelectedColor,
+                    SelectedMaterialStyle);
 
             DestroyGhost();
             PlaceRecord(record, true);
@@ -712,6 +730,9 @@ namespace BrickKids3D
                     record.a <= 0f
                         ? 1f
                         : record.a);
+
+            MaterialStyle materialStyle =
+                (MaterialStyle)Mathf.Clamp(record.materialStyle, 0, 9);
 
             int rotation =
                 ((record.rotation % 4) + 4) % 4;
@@ -745,6 +766,7 @@ namespace BrickKids3D
                     record.z,
                     rotation,
                     color,
+                    materialStyle,
                     false,
                     brickRoot);
 
@@ -760,7 +782,8 @@ namespace BrickKids3D
                         record.y,
                         record.z,
                         rotation,
-                        color);
+                        color,
+                        materialStyle);
 
                 undo.Push(
                     new BuildAction
@@ -978,7 +1001,8 @@ namespace BrickKids3D
                 piece.GridY,
                 piece.GridZ,
                 piece.RotationStep,
-                color);
+                color,
+                piece.MaterialStyle);
         }
 
         private BrickRecord MakeRecord(
@@ -987,7 +1011,8 @@ namespace BrickKids3D
             int y,
             int z,
             int rotation,
-            Color color)
+            Color color,
+            MaterialStyle materialStyle = MaterialStyle.GlossyPlastic)
         {
             return new BrickRecord
             {
@@ -999,7 +1024,8 @@ namespace BrickKids3D
                 r = color.r,
                 g = color.g,
                 b = color.b,
-                a = color.a
+                a = color.a,
+                materialStyle = (int)materialStyle
             };
         }
 
@@ -1368,7 +1394,8 @@ namespace BrickKids3D
             int y,
             int z,
             int rotation,
-            Color color)
+            Color color,
+            MaterialStyle materialStyle = MaterialStyle.GlossyPlastic)
         {
             BrickRecord record =
                 MakeRecord(

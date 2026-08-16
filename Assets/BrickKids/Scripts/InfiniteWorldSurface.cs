@@ -19,6 +19,7 @@ namespace BrickKids3D
 
         private int lastCenterX = int.MinValue;
         private int lastCenterZ = int.MinValue;
+        private bool surfaceVisible = true;
         private Color groundColor = new Color(0.52f, 0.58f, 0.62f);
 
         public void Build()
@@ -69,8 +70,25 @@ namespace BrickKids3D
 
         private void LateUpdate()
         {
+            RefreshVisibility();
+            if (!surfaceVisible) return;
             RefreshChunkPositions(false);
             RefreshFarFloor();
+        }
+
+        private void RefreshVisibility()
+        {
+            bool shouldShow = orbitCamera == null || !orbitCamera.IsBelowGroundView;
+            if (shouldShow == surfaceVisible) return;
+            surfaceVisible = shouldShow;
+
+            if (chunkRenderers != null)
+            {
+                for (int i = 0; i < chunkRenderers.Length; i++)
+                    if (chunkRenderers[i] != null) chunkRenderers[i].enabled = surfaceVisible;
+            }
+
+            if (farFloorRenderer != null) farFloorRenderer.enabled = surfaceVisible;
         }
 
         public void SetGroundColor(Color color)

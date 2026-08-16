@@ -24,6 +24,7 @@ namespace BrickKids3D
             int gz,
             int rotationStep,
             Color paletteColor,
+            MaterialStyle materialStyle,
             bool preview,
             Transform parent)
         {
@@ -40,7 +41,7 @@ namespace BrickKids3D
                 gz + worldDepth * 0.5f);
             root.transform.rotation = Quaternion.Euler(0f, rs * 90f, 0f);
 
-            BuildVisual(root.transform, spec, paletteColor, preview);
+            BuildVisual(root.transform, spec, paletteColor, materialStyle, preview);
 
             float physicalHeight = spec.isSurface
                 ? 0.12f
@@ -64,6 +65,7 @@ namespace BrickKids3D
                 gz,
                 rs,
                 paletteColor,
+                materialStyle,
                 preview,
                 null);
 
@@ -74,6 +76,7 @@ namespace BrickKids3D
             Transform root,
             BrickSpec spec,
             Color palette,
+            MaterialStyle materialStyle,
             bool preview)
         {
             if (preview)
@@ -84,6 +87,30 @@ namespace BrickKids3D
 
             switch (spec.visual)
             {
+                case ItemVisual.Cube:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.Cube, spec, palette, materialStyle, Vector3.one);
+                    break;
+                case ItemVisual.Cylinder:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.LowPolyStud, spec, palette, materialStyle, Vector3.one);
+                    break;
+                case ItemVisual.Sphere:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.Sphere, spec, palette, materialStyle, Vector3.one);
+                    break;
+                case ItemVisual.Cone:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.Cone, spec, palette, materialStyle, Vector3.one);
+                    break;
+                case ItemVisual.Slab:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.Cube, spec, palette, materialStyle, new Vector3(0.98f, 0.32f, 0.98f));
+                    break;
+                case ItemVisual.Column:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.LowPolyStud, spec, palette, materialStyle, new Vector3(0.72f, 1f, 0.72f));
+                    break;
+                case ItemVisual.Beam:
+                    BuildPrimitive(root, PrimitiveMeshLibrary.Cube, spec, palette, materialStyle, new Vector3(0.76f, 0.72f, 0.98f));
+                    break;
+                case ItemVisual.Stair:
+                    BuildStair(root, palette, materialStyle);
+                    break;
                 case ItemVisual.Door:
                     BuildDoor(root, palette);
                     break;
@@ -102,6 +129,33 @@ namespace BrickKids3D
                 case ItemVisual.Roof:
                     BuildRoof(root, palette);
                     break;
+                case ItemVisual.Wall:
+                    BuildWall(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Arch:
+                    BuildArch(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Chair:
+                    BuildChair(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Table:
+                    BuildTable(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Sofa:
+                    BuildSofa(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Bed:
+                    BuildBed(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Cabinet:
+                    BuildCabinet(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Shelf:
+                    BuildShelf(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Desk:
+                    BuildDesk(root, palette, materialStyle);
+                    break;
                 case ItemVisual.RoadStraight:
                     BuildRoadStraight(root);
                     break;
@@ -117,11 +171,20 @@ namespace BrickKids3D
                 case ItemVisual.Parking:
                     BuildParking(root);
                     break;
+                case ItemVisual.Grass:
+                    BuildGroundPatch(root, new Color(0.18f,0.46f,0.20f), 0.18f);
+                    break;
+                case ItemVisual.Sand:
+                    BuildGroundPatch(root, new Color(0.72f,0.61f,0.40f), 0.12f);
+                    break;
                 case ItemVisual.TreeRound:
                     BuildTreeRound(root);
                     break;
                 case ItemVisual.TreePine:
                     BuildTreePine(root);
+                    break;
+                case ItemVisual.Palm:
+                    BuildPalm(root);
                     break;
                 case ItemVisual.Bush:
                     BuildBush(root);
@@ -144,11 +207,50 @@ namespace BrickKids3D
                 case ItemVisual.Bus:
                     BuildBus(root, palette);
                     break;
+                case ItemVisual.Bicycle:
+                    BuildBicycle(root, palette, false);
+                    break;
+                case ItemVisual.Motorcycle:
+                    BuildBicycle(root, palette, true);
+                    break;
                 case ItemVisual.Lamp:
                     BuildLamp(root);
                     break;
                 case ItemVisual.Bench:
                     BuildBench(root, palette);
+                    break;
+                case ItemVisual.PersonAdult:
+                    BuildPerson(root, palette, 1.0f, false, false);
+                    break;
+                case ItemVisual.PersonChild:
+                    BuildPerson(root, palette, 0.78f, false, false);
+                    break;
+                case ItemVisual.PersonWorker:
+                    BuildPerson(root, palette, 1.0f, true, false);
+                    break;
+                case ItemVisual.PersonCasual:
+                    BuildPerson(root, palette, 1.0f, false, true);
+                    break;
+                case ItemVisual.TrafficLight:
+                    BuildTrafficLight(root);
+                    break;
+                case ItemVisual.RoadSign:
+                    BuildRoadSign(root);
+                    break;
+                case ItemVisual.TrashBin:
+                    BuildTrashBin(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Hydrant:
+                    BuildHydrant(root, palette);
+                    break;
+                case ItemVisual.Planter:
+                    BuildPlanter(root, palette, materialStyle);
+                    break;
+                case ItemVisual.Umbrella:
+                    BuildUmbrella(root, palette);
+                    break;
+                case ItemVisual.Bollard:
+                    BuildBollard(root, palette, materialStyle);
                     break;
                 default:
                     BuildPreview(root, spec);
@@ -692,6 +794,199 @@ namespace BrickKids3D
                     Quaternion.identity, BrickMaterialLibrary.Mirror,
                     Metal, 0.55f, 0.55f, true);
             }
+        }
+
+
+        private static void BuildPrimitive(Transform root, Mesh mesh, BrickSpec spec, Color color, MaterialStyle style, Vector3 scaleMul)
+        {
+            float h = Mathf.Max(0.18f, spec.heightLayers * BrickFactory.BrickHeight);
+            StyledPart(root, "Primitive", mesh,
+                new Vector3(0f, h * 0.5f, 0f),
+                new Vector3(spec.width * scaleMul.x, h * scaleMul.y, spec.depth * scaleMul.z),
+                Quaternion.identity, color, style, true);
+        }
+
+        private static void BuildStair(Transform root, Color color, MaterialStyle style)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                float h = (i + 1) * BrickFactory.BrickHeight;
+                StyledPart(root, "Step", PrimitiveMeshLibrary.Cube,
+                    new Vector3(0f, h * 0.5f, -1.5f + i),
+                    new Vector3(3.9f, h, 0.95f),
+                    Quaternion.identity, color, style, true);
+            }
+        }
+
+        private static void BuildWall(Transform root, Color color, MaterialStyle style)
+        {
+            float h = 5f * BrickFactory.BrickHeight;
+            StyledPart(root, "Wall", PrimitiveMeshLibrary.Cube,
+                new Vector3(0f, h * 0.5f, 0f),
+                new Vector3(3.94f, h, 0.32f),
+                Quaternion.identity, color, style, true);
+        }
+
+        private static void BuildArch(Transform root, Color color, MaterialStyle style)
+        {
+            float h = 5f * BrickFactory.BrickHeight;
+            StyledPart(root, "ArchL", PrimitiveMeshLibrary.Cube,
+                new Vector3(-1.35f, h * 0.45f, 0f), new Vector3(0.75f, h * 0.90f, 0.42f),
+                Quaternion.identity, color, style, true);
+            StyledPart(root, "ArchR", PrimitiveMeshLibrary.Cube,
+                new Vector3(1.35f, h * 0.45f, 0f), new Vector3(0.75f, h * 0.90f, 0.42f),
+                Quaternion.identity, color, style, true);
+            StyledPart(root, "ArchTop", PrimitiveMeshLibrary.Cube,
+                new Vector3(0f, h * 0.88f, 0f), new Vector3(3.45f, 0.74f, 0.42f),
+                Quaternion.identity, color, style, true);
+        }
+
+        private static void BuildChair(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Seat",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.72f,0f),new Vector3(1.55f,0.18f,1.55f),Quaternion.identity,color,style,true);
+            StyledPart(root,"Back",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.55f,0.68f),new Vector3(1.55f,1.55f,0.18f),Quaternion.identity,color,style,true);
+            for(int x=-1;x<=1;x+=2) for(int z=-1;z<=1;z+=2)
+                StyledPart(root,"Leg",PrimitiveMeshLibrary.Cube,new Vector3(x*0.56f,0.34f,z*0.56f),new Vector3(0.16f,0.68f,0.16f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildTable(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Top",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.45f,0f),new Vector3(2.8f,0.20f,3.7f),Quaternion.identity,color,style,true);
+            for(int x=-1;x<=1;x+=2) for(int z=-1;z<=1;z+=2)
+                StyledPart(root,"Leg",PrimitiveMeshLibrary.Cube,new Vector3(x*1.10f,0.72f,z*1.52f),new Vector3(0.18f,1.44f,0.18f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildSofa(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Base",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.55f,0f),new Vector3(2.8f,0.65f,4.55f),Quaternion.identity,color,style,true);
+            StyledPart(root,"Back",PrimitiveMeshLibrary.Cube,new Vector3(1.18f,1.35f,0f),new Vector3(0.45f,1.65f,4.55f),Quaternion.identity,color,style,true);
+            StyledPart(root,"ArmA",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.05f,-2.05f),new Vector3(2.7f,0.85f,0.42f),Quaternion.identity,color,style,true);
+            StyledPart(root,"ArmB",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.05f,2.05f),new Vector3(2.7f,0.85f,0.42f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildBed(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Frame",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.34f,0f),new Vector3(3.8f,0.42f,5.8f),Quaternion.identity,color,style,true);
+            Part(root,"Mattress",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.68f,0f),new Vector3(3.55f,0.40f,5.45f),Quaternion.identity,BrickMaterialLibrary.Matte,new Color(0.90f,0.91f,0.94f),0.18f,0f,true);
+            Part(root,"Pillow",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.94f,1.85f),new Vector3(2.7f,0.28f,1.10f),Quaternion.identity,BrickMaterialLibrary.Matte,new Color(0.96f,0.96f,0.98f),0.16f,0f,true);
+        }
+
+        private static void BuildCabinet(Transform root, Color color, MaterialStyle style)
+        {
+            float h=6f*BrickFactory.BrickHeight;
+            StyledPart(root,"Body",PrimitiveMeshLibrary.Cube,new Vector3(0f,h*0.5f,0f),new Vector3(2.85f,h,1.85f),Quaternion.identity,color,style,true);
+            Part(root,"Gap",PrimitiveMeshLibrary.Cube,new Vector3(0f,h*0.52f,-0.95f),new Vector3(0.06f,h*0.82f,0.03f),Quaternion.identity,BrickMaterialLibrary.Mirror,new Color(0.25f,0.27f,0.30f),0.7f,0.6f,false);
+        }
+
+        private static void BuildShelf(Transform root, Color color, MaterialStyle style)
+        {
+            float h=6f*BrickFactory.BrickHeight;
+            StyledPart(root,"SideL",PrimitiveMeshLibrary.Cube,new Vector3(-1.38f,h*0.5f,0f),new Vector3(0.16f,h,0.85f),Quaternion.identity,color,style,true);
+            StyledPart(root,"SideR",PrimitiveMeshLibrary.Cube,new Vector3(1.38f,h*0.5f,0f),new Vector3(0.16f,h,0.85f),Quaternion.identity,color,style,true);
+            for(int i=0;i<5;i++)
+                StyledPart(root,"Shelf",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.25f+i*0.78f,0f),new Vector3(2.9f,0.13f,0.92f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildDesk(Transform root, Color color, MaterialStyle style)
+        {
+            BuildTable(root,color,style);
+            StyledPart(root,"Drawer",PrimitiveMeshLibrary.Cube,new Vector3(0.75f,1.05f,0.90f),new Vector3(1.15f,0.62f,1.25f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildGroundPatch(Transform root, Color color, float smoothness)
+        {
+            Part(root,"GroundPatch",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.035f,0f),new Vector3(3.96f,0.07f,3.96f),Quaternion.identity,BrickMaterialLibrary.Matte,color,smoothness,0f,false);
+        }
+
+        private static void BuildPalm(Transform root)
+        {
+            Part(root,"Trunk",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,1.65f,0f),new Vector3(0.38f,3.3f,0.38f),Quaternion.Euler(0f,0f,-7f),BrickMaterialLibrary.Wood,Trunk,0.28f,0f,true);
+            for(int i=0;i<6;i++)
+            {
+                float a=i*60f;
+                Part(root,"Leaf",PrimitiveMeshLibrary.Cube,new Vector3(Mathf.Cos(a*Mathf.Deg2Rad)*0.75f,3.35f,Mathf.Sin(a*Mathf.Deg2Rad)*0.75f),new Vector3(0.28f,0.12f,1.65f),Quaternion.Euler(8f,a,0f),BrickMaterialLibrary.Foliage,Green,0.20f,0f,true);
+            }
+        }
+
+        private static void BuildBicycle(Transform root, Color color, bool motor)
+        {
+            for(int z=-1;z<=1;z+=2)
+            {
+                Part(root,"Wheel",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,0.48f,z*0.95f),new Vector3(0.92f,0.14f,0.92f),Quaternion.Euler(0f,0f,90f),BrickMaterialLibrary.Road,Tire,0.18f,0.02f,true);
+            }
+            StyledPart(root,"Frame",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.78f,0f),new Vector3(0.18f,0.18f,1.35f),Quaternion.Euler(0f,0f,25f),color,MaterialStyle.Metal,true);
+            StyledPart(root,"Handle",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.05f,-0.62f),new Vector3(0.85f,0.10f,0.10f),Quaternion.identity,color,MaterialStyle.Metal,true);
+            if(motor)
+                StyledPart(root,"Tank",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.90f,0.10f),new Vector3(0.75f,0.42f,0.90f),Quaternion.identity,color,MaterialStyle.GlossyPlastic,true);
+        }
+
+        private static void BuildPerson(Transform root, Color color, float scale, bool worker, bool casual)
+        {
+            Color skin=new Color(0.82f,0.62f,0.46f);
+            Color shirt=worker?new Color(0.95f,0.55f,0.08f):color;
+            Color pants=casual?new Color(0.16f,0.24f,0.48f):Darken(color,0.45f);
+            Part(root,"Body",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.75f*scale,0f),new Vector3(0.62f*scale,1.25f*scale,0.40f*scale),Quaternion.identity,BrickMaterialLibrary.Matte,shirt,0.20f,0f,true);
+            Part(root,"Head",PrimitiveMeshLibrary.Sphere,new Vector3(0f,2.72f*scale,0f),new Vector3(0.54f*scale,0.62f*scale,0.54f*scale),Quaternion.identity,BrickMaterialLibrary.Matte,skin,0.22f,0f,true);
+            for(int x=-1;x<=1;x+=2)
+            {
+                Part(root,"Arm",PrimitiveMeshLibrary.Cube,new Vector3(x*0.43f*scale,1.68f*scale,0f),new Vector3(0.16f*scale,1.18f*scale,0.18f*scale),Quaternion.Euler(0f,0f,x*7f),BrickMaterialLibrary.Matte,shirt,0.20f,0f,true);
+                Part(root,"Leg",PrimitiveMeshLibrary.Cube,new Vector3(x*0.18f*scale,0.63f*scale,0f),new Vector3(0.22f*scale,1.25f*scale,0.26f*scale),Quaternion.identity,BrickMaterialLibrary.Matte,pants,0.16f,0f,true);
+            }
+            if(worker)
+                Part(root,"Helmet",PrimitiveMeshLibrary.Sphere,new Vector3(0f,3.00f*scale,0f),new Vector3(0.62f*scale,0.28f*scale,0.62f*scale),Quaternion.identity,BrickMaterialLibrary.Plastic,new Color(1f,0.75f,0.08f),0.54f,0.02f,true);
+        }
+
+        private static void BuildTrafficLight(Transform root)
+        {
+            Part(root,"Pole",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,1.75f,0f),new Vector3(0.12f,3.5f,0.12f),Quaternion.identity,BrickMaterialLibrary.Mirror,Metal,0.7f,0.7f,true);
+            Part(root,"Box",PrimitiveMeshLibrary.Cube,new Vector3(0f,3.6f,0f),new Vector3(0.65f,1.45f,0.55f),Quaternion.identity,BrickMaterialLibrary.Matte,new Color(0.08f,0.09f,0.10f),0.15f,0f,true);
+            Color[] c={new Color(0.95f,0.08f,0.06f),new Color(1f,0.68f,0.05f),new Color(0.08f,0.78f,0.18f)};
+            for(int i=0;i<3;i++) Part(root,"Light",PrimitiveMeshLibrary.Sphere,new Vector3(0f,4.02f-i*0.40f,-0.30f),new Vector3(0.28f,0.28f,0.14f),Quaternion.identity,BrickMaterialLibrary.Plastic,c[i],0.78f,0.02f,false);
+        }
+
+        private static void BuildRoadSign(Transform root)
+        {
+            Part(root,"Pole",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,1.55f,0f),new Vector3(0.10f,3.1f,0.10f),Quaternion.identity,BrickMaterialLibrary.Mirror,Metal,0.7f,0.7f,true);
+            Part(root,"Sign",PrimitiveMeshLibrary.Cube,new Vector3(0f,3.15f,0f),new Vector3(0.95f,0.95f,0.10f),Quaternion.Euler(0f,0f,45f),BrickMaterialLibrary.Plastic,new Color(0.14f,0.48f,0.90f),0.56f,0.02f,true);
+        }
+
+        private static void BuildTrashBin(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Bin",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.62f,0f),new Vector3(0.82f,1.22f,0.82f),Quaternion.identity,color,style,true);
+            StyledPart(root,"Lid",PrimitiveMeshLibrary.Cube,new Vector3(0f,1.28f,0f),new Vector3(0.94f,0.12f,0.94f),Quaternion.identity,color,style,true);
+        }
+
+        private static void BuildHydrant(Transform root, Color color)
+        {
+            Color c=color.a>0?color:new Color(0.85f,0.12f,0.08f);
+            Part(root,"Body",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,0.60f,0f),new Vector3(0.58f,1.20f,0.58f),Quaternion.identity,BrickMaterialLibrary.Plastic,c,0.58f,0.05f,true);
+            Part(root,"Top",PrimitiveMeshLibrary.Sphere,new Vector3(0f,1.25f,0f),new Vector3(0.70f,0.36f,0.70f),Quaternion.identity,BrickMaterialLibrary.Plastic,c,0.58f,0.05f,true);
+        }
+
+        private static void BuildPlanter(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Pot",PrimitiveMeshLibrary.Cube,new Vector3(0f,0.45f,0f),new Vector3(1.65f,0.90f,1.65f),Quaternion.identity,color,style,true);
+            Part(root,"Plant",PrimitiveMeshLibrary.Sphere,new Vector3(0f,1.28f,0f),new Vector3(1.45f,1.05f,1.45f),Quaternion.identity,BrickMaterialLibrary.Foliage,Green,0.20f,0f,true);
+        }
+
+        private static void BuildUmbrella(Transform root, Color color)
+        {
+            Part(root,"Pole",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,1.45f,0f),new Vector3(0.10f,2.9f,0.10f),Quaternion.identity,BrickMaterialLibrary.Mirror,Metal,0.70f,0.70f,true);
+            Part(root,"Canopy",PrimitiveMeshLibrary.Cone,new Vector3(0f,3.10f,0f),new Vector3(2.15f,0.72f,2.15f),Quaternion.Euler(180f,0f,0f),BrickMaterialLibrary.Plastic,color,0.55f,0.02f,true);
+        }
+
+        private static void BuildBollard(Transform root, Color color, MaterialStyle style)
+        {
+            StyledPart(root,"Post",PrimitiveMeshLibrary.LowPolyStud,new Vector3(0f,0.55f,0f),new Vector3(0.42f,1.10f,0.42f),Quaternion.identity,color,style,true);
+        }
+
+        private static GameObject StyledPart(Transform root, string name, Mesh mesh, Vector3 localPosition, Vector3 localScale, Quaternion localRotation, Color color, MaterialStyle style, bool castShadow)
+        {
+            Material material=BrickMaterialLibrary.ForStyle(style);
+            GameObject part=Part(root,name,mesh,localPosition,localScale,localRotation,material,color,0.62f,0.03f,castShadow);
+            Renderer renderer=part.GetComponent<Renderer>();
+            BrickMaterialLibrary.SetStyled(renderer,color,style);
+            return part;
         }
 
         private static GameObject Part(

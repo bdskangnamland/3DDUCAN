@@ -6,73 +6,33 @@ namespace BrickKids3D
 {
     public static class BrickMaterialLibrary
     {
-        private static Material plastic;
-        private static Material matte;
-        private static Material road;
-        private static Material foliage;
-        private static Material wood;
+        private static Material styled;
+        private static Material woodFixed;
         private static Material ghost;
         private static Material glass;
         private static Material mirror;
         private static Material water;
 
-        public static Material Plastic
-        {
-            get
-            {
-                if (plastic == null)
-                {
-                    plastic = MakeOpaque("BrickKids_Plastic_Runtime", 0.03f, 0.68f);
-                }
-                return plastic;
-            }
-        }
-
-        public static Material Matte
-        {
-            get
-            {
-                if (matte == null)
-                {
-                    matte = MakeOpaque("BrickKids_Matte_Runtime", 0.0f, 0.20f);
-                }
-                return matte;
-            }
-        }
-
-        public static Material Road
-        {
-            get
-            {
-                if (road == null)
-                {
-                    road = MakeOpaque("BrickKids_Road_Runtime", 0.0f, 0.10f);
-                }
-                return road;
-            }
-        }
-
-        public static Material Foliage
-        {
-            get
-            {
-                if (foliage == null)
-                {
-                    foliage = MakeOpaque("BrickKids_Foliage_Runtime", 0.0f, 0.25f);
-                }
-                return foliage;
-            }
-        }
-
+        public static Material Plastic { get { return ForStyle(MaterialStyle.GlossyPlastic); } }
+        public static Material Matte { get { return ForStyle(MaterialStyle.MattePlastic); } }
+        public static Material Road { get { return ForStyle(MaterialStyle.MattePlastic); } }
+        public static Material Foliage { get { return ForStyle(MaterialStyle.MattePlastic); } }
         public static Material Wood
         {
             get
             {
-                if (wood == null)
+                if (woodFixed == null)
                 {
-                    wood = MakeOpaque("BrickKids_Wood_Runtime", 0.0f, 0.30f);
+                    Material baseMaterial = ForStyle(MaterialStyle.Wood);
+                    woodFixed = new Material(baseMaterial);
+                    woodFixed.name = "BrickKids_Wood_Runtime";
+                    woodFixed.enableInstancing = true;
+                    woodFixed.hideFlags = HideFlags.DontSave;
+                    if (woodFixed.HasProperty("_Style")) woodFixed.SetFloat("_Style", (float)MaterialStyle.Wood);
+                    if (woodFixed.HasProperty("_Smoothness")) woodFixed.SetFloat("_Smoothness", 0.30f);
+                    if (woodFixed.HasProperty("_Metallic")) woodFixed.SetFloat("_Metallic", 0.0f);
                 }
-                return wood;
+                return woodFixed;
             }
         }
 
@@ -151,23 +111,61 @@ namespace BrickKids3D
             }
         }
 
-        private static Material MakeOpaque(string name, float metallic, float smoothness)
+        public static Material ForStyle(MaterialStyle style)
         {
-            Shader shader = Resources.Load<Shader>("Shaders/Plastic");
-            if (shader == null) shader = Shader.Find("Specular");
-            Material material = new Material(shader);
-            material.name = name;
-            material.enableInstancing = true;
-            material.hideFlags = HideFlags.DontSave;
-            if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", metallic);
-            if (material.HasProperty("_Smoothness")) material.SetFloat("_Smoothness", smoothness);
-            return material;
+            if (style == MaterialStyle.Glass) return Glass;
+            if (style == MaterialStyle.Mirror) return Mirror;
+
+            if (styled == null)
+            {
+                Shader shader = Resources.Load<Shader>("Shaders/Styled");
+                if (shader == null) shader = Resources.Load<Shader>("Shaders/Plastic");
+                if (shader == null) shader = Shader.Find("Specular");
+                styled = new Material(shader);
+                styled.name = "BrickKids_Styled_Runtime";
+                styled.enableInstancing = true;
+                styled.hideFlags = HideFlags.DontSave;
+            }
+            return styled;
+        }
+
+        public static void StyleProperties(MaterialStyle style, out float smoothness, out float metallic)
+        {
+            smoothness = 0.62f;
+            metallic = 0.03f;
+            switch (style)
+            {
+                case MaterialStyle.MattePlastic: smoothness = 0.22f; metallic = 0.0f; break;
+                case MaterialStyle.Metal: smoothness = 0.56f; metallic = 0.72f; break;
+                case MaterialStyle.Chrome: smoothness = 0.94f; metallic = 0.98f; break;
+                case MaterialStyle.Wood: smoothness = 0.30f; metallic = 0.0f; break;
+                case MaterialStyle.Concrete: smoothness = 0.12f; metallic = 0.0f; break;
+                case MaterialStyle.Brick: smoothness = 0.18f; metallic = 0.0f; break;
+                case MaterialStyle.Stone: smoothness = 0.24f; metallic = 0.0f; break;
+                case MaterialStyle.Glass: smoothness = 0.94f; metallic = 0.04f; break;
+                case MaterialStyle.Mirror: smoothness = 0.98f; metallic = 0.96f; break;
+            }
+        }
+
+        public static void SetStyled(Renderer renderer, Color color, MaterialStyle style)
+        {
+            if (renderer == null) return;
+            float smoothness, metallic;
+            StyleProperties(style, out smoothness, out metallic);
+            MaterialPropertyBlock block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            Color c = color;
+            if (style == MaterialStyle.Glass && c.a > 0.72f) c.a = 0.42f;
+            block.SetColor("_Color", c);
+            block.SetFloat("_Smoothness", smoothness);
+            block.SetFloat("_Metallic", metallic);
+            block.SetFloat("_Style", (float)style);
+            renderer.SetPropertyBlock(block);
         }
 
         public static void SetSurface(Renderer renderer, Color color, float smoothness, float metallic)
         {
             if (renderer == null) return;
-
             MaterialPropertyBlock block = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(block);
             block.SetColor("_Color", color);

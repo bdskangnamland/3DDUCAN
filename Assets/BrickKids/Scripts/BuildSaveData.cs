@@ -15,6 +15,7 @@ namespace BrickKids3D
         public float g;
         public float b;
         public float a;
+        public int materialStyle;
     }
 
     [Serializable]

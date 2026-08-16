@@ -10,14 +10,12 @@ namespace BrickKids3D
         public int GridZ { get; private set; }
         public int RotationStep { get; private set; }
         public Color PieceColor { get; private set; }
+        public MaterialStyle MaterialStyle { get; private set; }
         public bool IsPreview { get; private set; }
 
         private Mesh generatedMesh;
 
-        public BrickSpec Spec
-        {
-            get { return BrickCatalog.Get(BrickId); }
-        }
+        public BrickSpec Spec { get { return BrickCatalog.Get(BrickId); } }
 
         public int Width
         {
@@ -37,20 +35,9 @@ namespace BrickKids3D
             }
         }
 
-        public int HeightLayers
-        {
-            get { return Spec.heightLayers; }
-        }
-
-        public bool IsSurface
-        {
-            get { return Spec.isSurface; }
-        }
-
-        public bool GroundOnly
-        {
-            get { return Spec.groundOnly; }
-        }
+        public int HeightLayers { get { return Spec.heightLayers; } }
+        public bool IsSurface { get { return Spec.isSurface; } }
+        public bool GroundOnly { get { return Spec.groundOnly; } }
 
         public void Configure(
             string id,
@@ -59,6 +46,7 @@ namespace BrickKids3D
             int gz,
             int rotationStep,
             Color color,
+            MaterialStyle materialStyle,
             bool preview,
             Mesh mesh)
         {
@@ -68,6 +56,7 @@ namespace BrickKids3D
             GridZ = gz;
             RotationStep = ((rotationStep % 4) + 4) % 4;
             PieceColor = color;
+            MaterialStyle = materialStyle;
             IsPreview = preview;
             generatedMesh = mesh;
         }
@@ -84,11 +73,7 @@ namespace BrickKids3D
             Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
             {
-                BrickMaterialLibrary.SetSurface(
-                    renderers[i],
-                    color,
-                    0.42f,
-                    0.0f);
+                BrickMaterialLibrary.SetSurface(renderers[i], color, 0.42f, 0f);
             }
         }
 

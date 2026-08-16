@@ -17,6 +17,7 @@ namespace BrickKids3D
             int gz,
             int rotationStep,
             Color color,
+            MaterialStyle materialStyle,
             bool preview,
             Transform parent)
         {
@@ -31,6 +32,7 @@ namespace BrickKids3D
                     gz,
                     rotationStep,
                     color,
+                    materialStyle,
                     preview,
                     parent);
             }
@@ -84,20 +86,22 @@ namespace BrickKids3D
             MeshRenderer renderer = root.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = preview
                 ? BrickMaterialLibrary.Ghost
-                : BrickMaterialLibrary.Plastic;
+                : BrickMaterialLibrary.ForStyle(materialStyle);
             renderer.shadowCastingMode = preview
                 ? ShadowCastingMode.Off
                 : ShadowCastingMode.On;
             renderer.receiveShadows = true;
 
-            Color visualColor = color;
-            if (preview) visualColor.a = 0.46f;
-
-            BrickMaterialLibrary.SetSurface(
-                renderer,
-                visualColor,
-                preview ? 0.42f : 0.70f,
-                preview ? 0f : 0.03f);
+            if (preview)
+            {
+                Color visualColor = color;
+                visualColor.a = 0.46f;
+                BrickMaterialLibrary.SetSurface(renderer, visualColor, 0.42f, 0f);
+            }
+            else
+            {
+                BrickMaterialLibrary.SetStyled(renderer, color, materialStyle);
+            }
 
             BoxCollider collider = root.AddComponent<BoxCollider>();
             collider.center = Vector3.zero;
@@ -115,6 +119,7 @@ namespace BrickKids3D
                 gz,
                 rs,
                 color,
+                materialStyle,
                 preview,
                 mesh);
 

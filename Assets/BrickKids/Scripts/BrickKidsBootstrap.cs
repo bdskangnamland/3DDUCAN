@@ -9,10 +9,10 @@ namespace BrickKids3D
     {
         public static readonly Rect WorkspaceViewport =
             new Rect(
-                0.095f,
-                0.155f,
-                0.84f,
-                0.745f);
+                0.072f,
+                0.205f,
+                0.864f,
+                0.695f);
 
         private bool worldCreated;
 
